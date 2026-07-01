@@ -1,0 +1,19 @@
+{
+  "name": "modelglass-router-examples",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cost-aware task router using the Modelglass LLM feed",
+  "scripts": {
+    "route": "node --import tsx/esm src/route.ts",
+    "demo": "node --import tsx/esm src/route.ts --demo"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
