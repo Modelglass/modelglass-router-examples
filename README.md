@@ -165,6 +165,40 @@ escalate to Claude Sonnet 4 — not the most expensive option.
 
 ---
 
+## Measuring real savings
+
+The router recommends but doesn't execute. After you run each subtask using the
+recommended model, feed the real token counts back with `npm run report`:
+
+```bash
+# After completing subtask 1 of the demo task using o4-mini:
+npm run report -- --task demo --subtask 1 \
+  --model o4-mini \
+  --actual-input 9500 --actual-output 2100
+```
+
+Each call appends one line to `logs/routing-log.jsonl` (gitignored — stays local).
+The entry records: recommended model, estimated tokens/cost, actual model used,
+actual tokens, actual cost, and a hypothetical baseline (what those tokens would
+have cost at the most expensive model in the pool).
+
+Once you've logged a few subtasks, run the summary:
+
+```bash
+npm run summary
+```
+
+This prints total actual spend, total estimated spend, and savings vs the
+hypothetical always-expensive-model baseline in both $ and %.
+
+**Why the router doesn't execute subtasks itself:** keeping N provider API keys
+out of this repo is an explicit goal. The report-back workflow (B2) lets real
+token counts flow in from whatever tool you actually used — Claude Code, a
+custom agent, direct API calls — without this repo needing credentials for any
+of them.
+
+---
+
 ## What's not here (intentional)
 
 - **Token-spend measurement/tracking** — deferred; see SCO-139.

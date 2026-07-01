@@ -6,7 +6,9 @@
   "description": "Cost-aware task router using the Modelglass LLM feed",
   "scripts": {
     "route": "node --import tsx/esm src/route.ts",
-    "demo": "node --import tsx/esm src/route.ts --demo"
+    "demo": "node --import tsx/esm src/route.ts --demo",
+    "report": "node --import tsx/esm src/report.ts",
+    "summary": "node --import tsx/esm src/summary.ts"
   },
   "engines": {
     "node": ">=20"
