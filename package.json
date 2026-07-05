@@ -3,18 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Cost-aware task router using the Modelglass LLM feed",
+  "description": "Worked examples of building on the live Modelglass pricing and capability feed",
   "scripts": {
-    "route": "node --import tsx/esm src/route.ts",
-    "demo": "node --import tsx/esm src/route.ts --demo",
-    "report": "node --import tsx/esm src/report.ts",
-    "summary": "node --import tsx/esm src/summary.ts"
+    "route": "node --import tsx/esm cost-aware-vscode-router/src/route.ts",
+    "demo": "node --import tsx/esm cost-aware-vscode-router/src/route.ts --demo",
+    "report": "node --import tsx/esm cost-aware-vscode-router/src/report.ts",
+    "summary": "node --import tsx/esm cost-aware-vscode-router/src/summary.ts",
+    "refine": "node --import tsx/esm av-prompt-refiner/src/refine.ts"
   },
   "engines": {
     "node": ">=20"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0"
+  },
   "devDependencies": {
+    "@types/node": "^20.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }
