@@ -1,4 +1,4 @@
-# cost-aware-vscode-router
+# Cost-Aware VS Code Router
 
 Cost-aware task router for development workflows. Routes each subtask of an
 incoming dev task to the **cheapest LLM that can handle it**, using the live

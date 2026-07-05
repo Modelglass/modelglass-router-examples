@@ -1,4 +1,4 @@
-# av-prompt-refiner
+# AV Prompt Refiner
 
 Capability-aware prompt rewriting for video and audio generation models,
 grounded in live [Modelglass](https://modelglass.com.au) capability data.
