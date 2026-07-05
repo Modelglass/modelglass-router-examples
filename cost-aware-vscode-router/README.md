@@ -1,4 +1,4 @@
-# modelglass-router-examples
+# cost-aware-vscode-router
 
 Cost-aware task router for development workflows. Routes each subtask of an
 incoming dev task to the **cheapest LLM that can handle it**, using the live
