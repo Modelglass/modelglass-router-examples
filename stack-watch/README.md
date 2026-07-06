@@ -5,7 +5,10 @@ uses. Teams pick a model once and rarely re-evaluate — prices move (the live
 Modelglass feed keeps append-only, provenance-stamped history for exactly
 this reason), models get deprecated or superseded, and cheaper capable
 alternatives appear. Nothing else surfaces that automatically; it's the
-dataset's most defensible asset and easy to leave invisible.
+dataset's most defensible asset and easy to leave invisible. Requires a
+Starter or Pro Modelglass key — unlike the other two examples in this repo,
+there's no Free-tier mode, since Free's ~2-day pricing-history window isn't
+enough for meaningful drift detection.
 
 **⚠️ Requires a Starter or Pro Modelglass key.** Unlike the other two
 examples in this repo, there's no Free-tier mode here — see
