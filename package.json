@@ -2,6 +2,7 @@
   "name": "modelglass-router-examples",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "Worked examples of building on the live Modelglass pricing and capability feed",
   "scripts": {

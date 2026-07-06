@@ -192,8 +192,4 @@ Fun, upbeat instrumental cue for a playful beach scene at golden hour ...
 
 ---
 
-Copyright © 2026 Modelglass Pty Ltd. All rights reserved.
-
-This software and its source code are proprietary and confidential.
-Unauthorised copying, modification, distribution, or use is strictly prohibited.
-Access to data and APIs is subject to the Modelglass Terms of Service.
+Copyright © 2026 Modelglass Pty Ltd. Licensed under the MIT License — see [LICENSE](../LICENSE).

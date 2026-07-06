@@ -211,4 +211,4 @@ of them.
 
 ---
 
-Copyright © 2026 Modelglass Pty Ltd. All rights reserved.
+Copyright © 2026 Modelglass Pty Ltd. Licensed under the MIT License — see [LICENSE](../LICENSE).
