@@ -93,6 +93,11 @@ capability-vertical registries (coding/science/agentic — see
 [What's excluded](#whats-not-here-intentional) for what that case does and
 doesn't cover).
 
+**Testing against a non-production API instance:** set `MODELGLASS_API_URL`
+to override the base URL (default: `https://modelglass-api.vercel.app`) —
+e.g. to point at a local `pnpm dev:api` instance from the main `modelglass`
+repo. Not needed for normal use.
+
 **Drop it into cron:**
 
 ```bash
@@ -160,40 +165,78 @@ window. Pro: full history, no window limit).
 
 Exit code: `1`.
 
-## Illustrative example — Starter/Pro drift report (not an observed run)
+## Worked example — drift report (real, verified run against a local dev instance)
 
-**This section is illustrative, not a real run.** No Starter/Pro key was
-available while building this — the output format below matches exactly
-what `watch.ts` produces (verified via the test suite in `src/lib.test.ts`,
-which exercises the real drift-computation logic against fixture data), but
-the specific numbers here are constructed for illustration, not observed
-against a live account. Scott will confirm the real behavior once he can
-test against an actual Starter/Pro key.
+No Starter/Pro key existed against **production** while building this, so this
+section was verified a different way: a **local instance of the Modelglass
+API** (the exact same `packages/api` code, run via `pnpm dev:api` in the main
+`modelglass` repo), authenticated with `mg_starter_devkey` — a fixed,
+non-secret dev key that repo seeds automatically for local development only
+(confirmed **no-op in production**, since it only seeds when
+`UPSTASH_REDIS_REST_URL` is unset). `GET /v1/keys` against that instance
+returns `"tier": "starter"` for it, same real signal `requireStarterOrPro()`
+checks in production — so the tier gate itself, not just the report logic
+downstream of it, is exercised for real here, just against a local server
+instead of `modelglass-api.vercel.app`. Pointed at it via the optional
+`MODELGLASS_API_URL` override (see [Usage](#usage)); everything else —
+fetch, tier check, snapshot diffing, report rendering, exit code — is the
+same code path production would run.
+
+Two models already in that repo's own local registry
+(`bfl/flux-1-1-pro`, `stability-ai/stable-image-ultra`) stood in for the
+stack. First run recorded a real baseline against that (unmodified) local
+data. To produce a genuine second-run diff without touching any source-of-
+truth registry data, the tool's own local snapshot file
+(`logs/stack-snapshot.json` — gitignored state, not registry data) was then
+edited to record different prior values — the same effect as if the tool
+had genuinely run once, weeks earlier, and the registry had moved on since.
+The second run below diffed those edited prior values against the real,
+unmodified current data from the local API — the drift computation, every
+number in the output, and the exit code are all genuinely produced by the
+tool, not hand-typed:
 
 ```
+> node --import tsx/esm stack-watch/src/watch.ts local-dev-stack.json
+
+Fetching 2 model(s) from http://localhost:8787 ...
+
 ────────────────────────────────────────────────────────────────────────────────
   stack-watch
 ────────────────────────────────────────────────────────────────────────────────
 
   PRICE CHANGES (1):
-  o4-mini (openai, input): $1.25/1m_tokens_input → $1.10/1m_tokens_input on 2026-07-01 — source: https://openai.com/pricing
+  FLUX 1.1 [pro] (replicate, default): $0.035/image → $0.04/image on 2026-06-09 — source: https://replicate.com/black-forest-labs/flux-1.1-pro
 
   LIFECYCLE CHANGES (1):
-  Kling 1.6 (klingai): status ga → deprecated
+  Stable Image Ultra (stability-ai): status deprecated → ga
 
   CAPABILITY RATING CHANGES (1):
-  Stable Audio 3.0: vocal-support good → strong
-
-  SWITCH SUGGESTIONS (1):
-  o4-mini → Gemini 2.5 Pro (google-deepmind): 12% cheaper, same "coding: strong" rating — fields: capability_profile.coding, tiers.pricing
+  FLUX 1.1 [pro]: photorealism good → strong
 
 ────────────────────────────────────────────────────────────────────────────────
 ```
 
-Exit code: `1` (there's something actionable).
+Exit code: `1` (there's something actionable) — verified.
+
+**No switch suggestion appeared, and that's the honest result, not an
+omission**: `GET /v1/models/bfl%2Fflux-1-1-pro/competitors` was checked for
+real against the same local instance, and every listed competitor was the
+same price or more expensive — `computeSwitchSuggestions` only surfaces a
+candidate when one is genuinely cheaper, so it correctly stayed silent here
+rather than manufacturing a suggestion.
 
 On a run with nothing to report, the tool prints `No drift since last run —
-stack unchanged (N model(s) checked).` and exits `0`.
+stack unchanged (N model(s) checked).` and exits `0` (covered by the
+`computeDrift` "no drift" test in `src/lib.test.ts`, not separately
+re-verified live).
+
+**What's still unverified:** this confirms the tier gate and the full
+drift/report pipeline work end-to-end against a real Starter-tier account —
+just not against `modelglass-api.vercel.app` itself, and not yet against
+Pro, against a stack spanning llm/video/audio (the demo stack does, but
+wasn't used for this run — see below), or against a longer-lived snapshot
+across a real time gap. Scott can confirm those once he has a production
+Starter/Pro key.
 
 ---
 
@@ -214,7 +257,14 @@ stack unchanged (N model(s) checked).` and exits `0`.
   `cost-aware-vscode-router`'s own approach: it extracts a SWE-bench
   Verified percentage from `capability_profile.coding.notes` free text via
   regex, when present, rather than from a dedicated benchmark endpoint —
-  there isn't one.)
+  there isn't one.) Re-confirmed live against production on 2026-07-06:
+  `GET /v1/benchmarks` still returns only the seven image-modality ontology
+  benchmarks (`clip-score`, `dpg-bench`, `fid`, `geneval`, `hpsv2`,
+  `pickscore`, `t2i-compbench`); `openai/o4-mini`'s
+  `knowledge.benchmarks` field is `null`; its SWE-bench Verified score
+  (68.1%) only exists as free text inside
+  `capability_profile.coding.notes`, exactly the shape
+  `cost-aware-vscode-router`'s regex already handles.
 - **Provider-level outage/latency monitoring** — this watches the
   registry's pricing/lifecycle/capability data, not live API uptime for
   each provider.

@@ -117,7 +117,11 @@ interface CompetitorsResponse {
 // Modelglass API
 // ---------------------------------------------------------------------------
 
-export const MODELGLASS_API = "https://modelglass-api.vercel.app";
+// Override for pointing at a local/self-hosted API instance (e.g. `pnpm dev:api`
+// in the main modelglass repo) — used to verify this tool against a Starter/Pro
+// dev key without touching production billing. Unset in normal use; defaults to
+// the live production API.
+export const MODELGLASS_API = process.env["MODELGLASS_API_URL"] || "https://modelglass-api.vercel.app";
 
 async function apiGet<T>(path: string, apiKey: string): Promise<T> {
   const res = await fetch(`${MODELGLASS_API}${path}`, {
