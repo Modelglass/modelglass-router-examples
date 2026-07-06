@@ -6,9 +6,8 @@ job will actually cost is genuinely fiddly: the same model is often priced
 differently across hosts, and offerings bill in incompatible units — the
 live image feed today mixes `per_image`, `per_megapixel`, `per_credit`, and
 `per_month` tiers in the same pool. Cross-host arbitrage on identical models
-is real, current data (see [Worked example](#worked-example-real-run-against-the-live-feed)
-below) — this surfaces it directly, with the repo's standard grounded
-rationale for every inclusion, exclusion, and unit conversion.
+is real, current data — this surfaces it directly, with the repo's standard
+grounded rationale for every inclusion, exclusion, and unit conversion.
 
 Free-tier friendly — only current prices are needed, no pricing-history
 lookback, no LLM call. Pure data + arithmetic.
