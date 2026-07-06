@@ -12,7 +12,8 @@
     "summary": "node --import tsx/esm cost-aware-vscode-router/src/summary.ts",
     "refine": "node --import tsx/esm av-prompt-refiner/src/refine.ts",
     "watch": "node --import tsx/esm stack-watch/src/watch.ts",
-    "test": "node --import tsx/esm --test stack-watch/src/*.test.ts"
+    "cost": "node --import tsx/esm image-batch-coster/src/cost.ts",
+    "test": "node --import tsx/esm --test stack-watch/src/*.test.ts image-batch-coster/src/*.test.ts"
   },
   "engines": {
     "node": ">=20"
