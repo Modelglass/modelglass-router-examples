@@ -8,12 +8,14 @@ Worked examples of building on top of the live [Modelglass](https://modelglass.c
 |---|---|---|---|
 | `cost-aware-vscode-router` | LLM (text) | Routes each subtask of a dev task to the cheapest LLM that clears a confirmed-benchmark quality bar, using the live Modelglass LLM feed as the model pool. | [README](cost-aware-vscode-router/README.md) |
 | `av-prompt-refiner` | Video, Audio | Given a rough prompt and one or two already-chosen models, pulls MCP capability-profile data (prompt conventions, supported params, known quirks) and rewrites the prompt to fit that model specifically — including a coordinated video+audio mode that reasons across both profiles at once. | [README](av-prompt-refiner/README.md) |
+| `stack-watch` | LLM, image, video, audio (cross-modality) | Price-drift and deprecation watchdog for a fixed list of models — flags price changes, deprecations/supersessions, and grounded cheaper-alternative suggestions since the last run. **Requires a Starter or Pro key** — the only example that doesn't run on Free (a 2-day pricing-history window isn't enough for meaningful drift detection at any realistic check-in cadence). | [README](stack-watch/README.md) |
 
 ## Requirements
 
 - Node.js 20+
 - A Modelglass API key ([get a free one](https://modelglass.com.au/signup)) — required by every example
 - `av-prompt-refiner` additionally requires an Anthropic API key (`ANTHROPIC_API_KEY`) — see its own README
+- `stack-watch` additionally requires that key to be **Starter or Pro**, not Free — see its own README for why
 
 ## Setup
 
