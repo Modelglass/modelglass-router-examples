@@ -79,18 +79,18 @@ function printRoutingTable(task: Task, models: NormalisedModel[]): void {
 
   console.log("\n  CODING MODEL POOL  (coding=strong, ranked by SWE-bench Verified)\n");
   console.log(
-    `  ${"Model".padEnd(28)} ${"SWE-bench Verified".padEnd(22)} ${"Input/1M".padEnd(12)} Output/1M`,
+    `  ${"Model".padEnd(28)} ${"SWE-bench Verified (source, type)".padEnd(36)} ${"Input/1M".padEnd(12)} Output/1M`,
   );
-  console.log("  " + "─".repeat(76));
+  console.log("  " + "─".repeat(90));
   for (const m of ranked) {
     const marker = m === codingModel ? "← selected" : "";
     const score = `${m.sweBenchVerified}%  (${m.sweBenchSource})`;
     console.log(
-      `  ${m.name.padEnd(28)} ${score.padEnd(22)} ${fmtPrice(m.inputPricePerM).padEnd(12)} ${fmtPrice(m.outputPricePerM)}  ${marker}`,
+      `  ${m.name.padEnd(28)} ${score.padEnd(36)} ${fmtPrice(m.inputPricePerM).padEnd(12)} ${fmtPrice(m.outputPricePerM)}  ${marker}`,
     );
   }
   if (excluded.length) {
-    console.log("\n  Excluded (no confirmed SWE-bench Verified score):");
+    console.log("\n  Excluded from the ranked pool:");
     for (const { model: m, reason } of excluded) {
       console.log(`  ✗ ${m.name}: ${reason}`);
     }
