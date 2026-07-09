@@ -32,6 +32,22 @@ export interface CapabilityDim {
   notes?: string;
 }
 
+/**
+ * A curated benchmark score from the feed's `knowledge.benchmarks` — sourced
+ * from the Modelglass coding-capability registry and joined into the model
+ * payload by the API. Every score carries provenance: the source URL and its
+ * type (vendor / leaderboard / paper / independent).
+ */
+export interface BenchmarkScore {
+  benchmark: string;
+  score: number; // 0–1 fraction
+  score_date?: string;
+  harness?: string;
+  variant?: string;
+  source: { url: string; type: string; verified_at?: string };
+  notes?: string;
+}
+
 export interface PricingEntry {
   amount: number;
   currency: string;
@@ -53,7 +69,10 @@ export interface Offering {
 export interface ModelEntry {
   model_id: string;
   name: string;
-  knowledge?: { capability_profile?: CapabilityDim[] };
+  knowledge?: {
+    capability_profile?: CapabilityDim[];
+    benchmarks?: BenchmarkScore[];
+  };
   offerings: Offering[];
 }
 
@@ -67,10 +86,11 @@ export interface NormalisedModel {
   slug: string;
   qualityTier: string;
   codingRating: string | null;
-  codingNotes: string;
   instrRating: string | null;
   sweBenchVerified: number | null;
   sweBenchSource: string;
+  /** Model has a curated SWE-bench Pro score (a different benchmark). */
+  hasSweBenchPro: boolean;
   inputPricePerM: number | null;
   outputPricePerM: number | null;
 }
@@ -103,7 +123,8 @@ export interface LogEntry {
 // Modelglass API
 // ---------------------------------------------------------------------------
 
-export const MODELGLASS_API = "https://modelglass-api.vercel.app";
+export const MODELGLASS_API =
+  process.env.MODELGLASS_API ?? "https://modelglass-api.vercel.app";
 
 export async function fetchLLMModels(apiKey: string): Promise<NormalisedModel[]> {
   const res = await fetch(`${MODELGLASS_API}/v1/models?modality=llm`, {
@@ -122,12 +143,26 @@ export async function fetchLLMModels(apiKey: string): Promise<NormalisedModel[]>
 // Normalisation
 // ---------------------------------------------------------------------------
 
-export function extractSweBenchVerified(notes: string): { score: number | null; source: string } {
-  const m = notes.match(/SWE-bench Verified\s+([\d.]+)%\s*\(([^)]+)\)/i);
-  if (m) {
-    return { score: parseFloat(m[1]), source: m[2].trim().split(",")[0].trim() };
+/**
+ * Read a model's curated SWE-bench Verified score from the structured
+ * `knowledge.benchmarks` field — score + provenance as curated in the
+ * Modelglass coding-capability registry, not parsed out of prose.
+ */
+export function sweBenchVerifiedScore(
+  benchmarks: BenchmarkScore[] | undefined,
+): { score: number | null; source: string } {
+  const entry = benchmarks?.find((b) => b.benchmark === "swe-bench-verified");
+  if (!entry) return { score: null, source: "" };
+  let host = entry.source.url;
+  try {
+    host = new URL(entry.source.url).hostname.replace(/^www\./, "");
+  } catch {
+    // keep the raw URL if it doesn't parse
   }
-  return { score: null, source: "" };
+  return {
+    score: Math.round(entry.score * 1000) / 10, // 0–1 fraction → percent, 1 dp
+    source: `${host}, ${entry.source.type}`,
+  };
 }
 
 export function currentPrice(tiers: Tier[], id: string): number | null {
@@ -139,13 +174,14 @@ export function currentPrice(tiers: Tier[], id: string): number | null {
 export function normalise(m: ModelEntry): NormalisedModel {
   const cap = m.knowledge?.capability_profile ?? [];
   let codingRating: string | null = null;
-  let codingNotes = "";
   let instrRating: string | null = null;
   for (const dim of cap) {
-    if (dim.dimension === "coding") { codingRating = dim.rating; codingNotes = dim.notes ?? ""; }
+    if (dim.dimension === "coding") codingRating = dim.rating;
     if (dim.dimension === "instruction-following") instrRating = dim.rating;
   }
-  const { score: sweBenchVerified, source: sweBenchSource } = extractSweBenchVerified(codingNotes);
+  const benchmarks = m.knowledge?.benchmarks;
+  const { score: sweBenchVerified, source: sweBenchSource } = sweBenchVerifiedScore(benchmarks);
+  const hasSweBenchPro = benchmarks?.some((b) => b.benchmark === "swe-bench-pro") ?? false;
   const offering = [...m.offerings].sort(
     (a, b) =>
       (currentPrice(a.tiers, "input") ?? Infinity) -
@@ -156,10 +192,10 @@ export function normalise(m: ModelEntry): NormalisedModel {
     slug: offering?.slug ?? m.model_id,
     qualityTier: offering?.quality_tier ?? "",
     codingRating,
-    codingNotes,
     instrRating,
     sweBenchVerified,
     sweBenchSource,
+    hasSweBenchPro,
     inputPricePerM: offering ? currentPrice(offering.tiers, "input") : null,
     outputPricePerM: offering ? currentPrice(offering.tiers, "output") : null,
   };
@@ -184,14 +220,16 @@ export function selectCodingModel(models: NormalisedModel[]): CodingSelection {
   for (const m of strong) {
     if (m.sweBenchVerified !== null) {
       ranked.push(m);
+    } else if (m.hasSweBenchPro) {
+      excluded.push({
+        model: m,
+        reason: "has a curated SWE-bench Pro score (different benchmark) — not SWE-bench Verified",
+      });
     } else {
-      let reason = "no confirmed SWE-bench Verified score in primary sources";
-      if (m.codingNotes.toLowerCase().includes("internal") || m.codingNotes.toLowerCase().includes("vendor-reported")) {
-        reason = "score is vendor-reported / internal eval — not independently verified";
-      } else if (m.codingNotes.toLowerCase().includes("swe-bench pro")) {
-        reason = "has SWE-bench Pro score (different benchmark) — not SWE-bench Verified";
-      }
-      excluded.push({ model: m, reason });
+      excluded.push({
+        model: m,
+        reason: "no curated SWE-bench Verified score in the Modelglass registry",
+      });
     }
   }
 
