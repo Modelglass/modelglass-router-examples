@@ -155,7 +155,9 @@ function printRoutingTable(task: Task, models: NormalisedModel[]): void {
     if (next) {
       console.log(
         `\n  Escalation: if coding subtasks fail correctness review → retry on ${next.name}` +
-          ` (SWE-bench Verified ${next.sweBenchVerified}%, ${fmtPrice(next.inputPricePerM)}/1M input)`,
+          ` (SWE-bench Verified ${next.sweBenchVerified}%, ${fmtPrice(next.inputPricePerM)}/1M input)` +
+          `\n  When you do, log it with 'npm run report -- ... --model "${next.name}" --escalated'` +
+          ` so it's tracked as an escalation, not an override.`,
       );
     }
   }
