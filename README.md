@@ -30,6 +30,15 @@ export MODELGLASS_API_KEY=<your-key>
 
 Dependencies and npm scripts are shared at the repo root across all examples — each example's own README documents its specific `npm run` commands.
 
+## Development
+
+```bash
+npx tsc --noEmit   # typecheck every example
+npm test           # run every example's test suite (node:test)
+```
+
+Both run in CI (`.github/workflows/validate.yml`) on every PR and push to `main`.
+
 ## What's not here (intentional, across every example)
 
 - **Hosted/live demos** — these are CLI/code examples meant to be read and adapted, not run as hosted tools.

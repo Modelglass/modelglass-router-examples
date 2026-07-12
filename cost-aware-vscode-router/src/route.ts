@@ -12,6 +12,7 @@ import { readFileSync } from "node:fs";
 import {
   type Task,
   type NormalisedModel,
+  DEMO_TASK,
   fetchLLMModels,
   selectCodingModel,
   selectWritingModel,
@@ -23,48 +24,6 @@ import {
   requireApiKey,
   MODELGLASS_API,
 } from "./lib.js";
-
-// ---------------------------------------------------------------------------
-// Demo task (rate-limiting middleware — from sco-139-orchestrator-routing-design.md §4)
-// ---------------------------------------------------------------------------
-
-const DEMO_TASK: Task = {
-  description:
-    "Add per-endpoint rate limiting middleware to the Modelglass API " +
-    "(Redis KV, 429/Retry-After, unit tests, PR description, Slack summary).",
-  subtasks: [
-    {
-      description: "Implement rate-limit middleware (Upstash KV, 429/Retry-After)",
-      tag: "coding",
-      // Moderately demanding real-world SWE task, not a frontier-tier bar —
-      // 65 excludes the current pool's weaker scored candidate while still
-      // being clearable by more than one model (SCO-165 finding #1; value
-      // chosen against the live feed on 2026-07-12, see README).
-      minSweBenchVerified: 65,
-      estimatedInputTokens: 10_000,
-      estimatedOutputTokens: 2_500,
-    },
-    {
-      description: "Write unit tests (pass/reject/tier-boundary)",
-      tag: "coding",
-      minSweBenchVerified: 65,
-      estimatedInputTokens: 8_000,
-      estimatedOutputTokens: 2_000,
-    },
-    {
-      description: "Write PR description explaining the change and testing approach",
-      tag: "writing",
-      estimatedInputTokens: 3_000,
-      estimatedOutputTokens: 500,
-    },
-    {
-      description: "Write Slack summary for the team announcing the change",
-      tag: "writing",
-      estimatedInputTokens: 2_000,
-      estimatedOutputTokens: 200,
-    },
-  ],
-};
 
 // ---------------------------------------------------------------------------
 // Output rendering

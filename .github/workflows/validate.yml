@@ -1,0 +1,29 @@
+name: Validate & test
+
+# Gate every PR and every push to main. Single job, scaled to this repo's
+# size: one npm workspace, no Python/build-artifact step (unlike the main
+# modelglass repo's multi-job graph — see that repo's
+# .github/workflows/validate.yml for the pattern this is adapted from).
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Typecheck + test all examples
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck (strict, all examples)
+        run: npx tsc --noEmit
+      - name: Run tests (all examples)
+        run: npm test
