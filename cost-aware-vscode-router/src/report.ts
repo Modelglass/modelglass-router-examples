@@ -18,6 +18,7 @@ import {
   selectCodingModel,
   selectWritingModel,
   codingQualityBar,
+  deviationType,
   estimateCost,
   mostExpensiveInPool,
   requireApiKey,
@@ -36,6 +37,7 @@ function parseArgs(argv: string[]): {
   modelArg: string;
   actualInput: number;
   actualOutput: number;
+  escalated: boolean;
 } {
   const get = (flag: string): string | undefined => {
     const i = argv.indexOf(flag);
@@ -47,6 +49,7 @@ function parseArgs(argv: string[]): {
   const modelArg = get("--model");
   const actualInputArg = get("--actual-input");
   const actualOutputArg = get("--actual-output");
+  const escalated = argv.includes("--escalated");
 
   const missing = [
     !taskArg && "--task",
@@ -62,9 +65,13 @@ function parseArgs(argv: string[]): {
         "Usage:\n" +
         "  npm run report -- --task <task.json|demo> --subtask <n> \\\n" +
         "    --model <model-name-or-slug> \\\n" +
-        "    --actual-input <tokens> --actual-output <tokens>\n\n" +
-        "  --subtask   1-based index matching the routing table\n" +
-        "  --model     model name or slug as shown in routing output (e.g. 'o4-mini')\n",
+        "    --actual-input <tokens> --actual-output <tokens> [--escalated]\n\n" +
+        "  --subtask    1-based index matching the routing table\n" +
+        "  --model      model name or slug as shown in routing output (e.g. 'o4-mini')\n" +
+        "  --escalated  mark this as a retry-after-failure (e.g. following the\n" +
+        "               router's escalation suggestion), not a plain override.\n" +
+        "               Only meaningful when --model differs from the\n" +
+        "               recommendation; ignored otherwise.\n",
     );
     process.exit(1);
   }
@@ -81,6 +88,7 @@ function parseArgs(argv: string[]): {
     modelArg: modelArg!,
     actualInput: parseInt(actualInputArg!, 10),
     actualOutput: parseInt(actualOutputArg!, 10),
+    escalated,
   };
 }
 
@@ -129,7 +137,7 @@ const DEMO_TASK: Task = {
 async function main(): Promise<void> {
   const apiKey = requireApiKey();
   const args = process.argv.slice(2);
-  const { taskArg, subtaskIndex, modelArg, actualInput, actualOutput } = parseArgs(args);
+  const { taskArg, subtaskIndex, modelArg, actualInput, actualOutput, escalated } = parseArgs(args);
 
   // Load task
   let task: Task;
@@ -208,6 +216,7 @@ async function main(): Promise<void> {
     actual_input_tokens: actualInput,
     actual_output_tokens: actualOutput,
     actual_cost_usd: actualCost,
+    deviation_type: deviationType(recommended?.name ?? "(none)", actualModelEntry?.name ?? modelArg, escalated),
     baseline_model_name: baseline?.name ?? "(none)",
     baseline_cost_usd: baselineCost,
     delta_usd: actualCost - estimatedCost,
@@ -219,9 +228,11 @@ async function main(): Promise<void> {
 
   console.log(`\n  Logged subtask ${subtaskIndex}: "${subtask.description}"`);
   console.log(`  Recommended: ${entry.recommended_model_name} (${entry.recommended_model_provider})`);
+  const deviationLabel =
+    entry.deviation_type === "escalation" ? "  [escalation]" : entry.deviation_type === "override" ? "  [override]" : "";
   console.log(
     `  Actual:      ${entry.actual_model_name} (${entry.actual_model_provider || "unknown"})` +
-      `  (${actualInput} in / ${actualOutput} out)`,
+      `  (${actualInput} in / ${actualOutput} out)${deviationLabel}`,
   );
   console.log(`  Est. cost:   $${estimatedCost.toFixed(5)}`);
   console.log(`  Actual cost: $${actualCost.toFixed(5)}`);

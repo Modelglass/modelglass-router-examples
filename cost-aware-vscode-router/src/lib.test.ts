@@ -14,6 +14,7 @@ import {
   type NormalisedModel,
   type Task,
   codingQualityBar,
+  deviationType,
   normalise,
   selectCodingModel,
   selectWritingModel,
@@ -254,5 +255,24 @@ describe("normalise", () => {
     const entry = makeModelEntry({ model_id: "orphan/model", name: "Orphan Model" });
     const result = normalise(entry);
     assert.equal(result.provider, "");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deviationType — escalation vs override distinction (SCO-165 finding #6)
+// ---------------------------------------------------------------------------
+
+describe("deviationType", () => {
+  test("actual matches recommended → none, regardless of the --escalated flag", () => {
+    assert.equal(deviationType("o4-mini", "o4-mini", false), "none");
+    assert.equal(deviationType("o4-mini", "o4-mini", true), "none");
+  });
+
+  test("actual differs from recommended and --escalated is set → escalation", () => {
+    assert.equal(deviationType("o4-mini", "Gemini 2.5 Pro", true), "escalation");
+  });
+
+  test("actual differs from recommended and --escalated is not set → override", () => {
+    assert.equal(deviationType("o4-mini", "Gemini 2.5 Pro", false), "override");
   });
 });

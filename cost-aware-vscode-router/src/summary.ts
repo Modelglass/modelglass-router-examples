@@ -9,6 +9,9 @@
  *   - Total estimated spend
  *   - Hypothetical baseline (same tokens at most-expensive model in each run's pool)
  *   - Savings vs baseline ($ and %)
+ *   - Escalations vs overrides — how many logged subtasks deviated from the
+ *     recommended model, split by whether `npm run report` was called with
+ *     `--escalated` (a retry-after-failure) or not (a plain override)
  */
 
 import { readFileSync, existsSync } from "node:fs";
@@ -71,7 +74,7 @@ function main(): void {
 
   // Per-entry breakdown
   console.log("\n" + hr());
-  console.log("  Per-subtask breakdown\n");
+  console.log("  Per-subtask breakdown  (⚑ escalation, ⚠ override — see summary below)\n");
   console.log(
     `  ${"#".padEnd(3)} ${"Subtask".padEnd(42)} ${"Recommended".padEnd(22)} ${"Actual".padEnd(22)} ${"Est. cost".padEnd(12)} ${"Act. cost".padEnd(12)} ${"Baseline".padEnd(12)} Delta`,
   );
@@ -90,7 +93,8 @@ function main(): void {
       e.actual_model_name.length > 20
         ? e.actual_model_name.slice(0, 18) + ".."
         : e.actual_model_name;
-    const flagged = e.actual_model_name !== e.recommended_model_name ? " ⚑" : "";
+    const flagged =
+      e.deviation_type === "escalation" ? " ⚑" : e.deviation_type === "override" ? " ⚠" : "";
     const delta = e.delta_usd >= 0 ? `+${fmtCost(e.delta_usd)}` : fmtCost(e.delta_usd);
     console.log(
       `  ${String(e.subtask_index).padEnd(3)} ${desc.padEnd(42)} ${recommended.padEnd(22)} ${(actual + flagged).padEnd(22)} ${fmtCost(e.estimated_cost_usd).padEnd(12)} ${fmtCost(e.actual_cost_usd).padEnd(12)} ${fmtCost(e.baseline_cost_usd).padEnd(12)} ${delta}`,
@@ -101,10 +105,16 @@ function main(): void {
     `  ${"".padEnd(3)} ${"".padEnd(42)} ${"".padEnd(22)} ${"Totals".padEnd(22)} ${fmtCost(totalEstimated).padEnd(12)} ${fmtCost(totalActual).padEnd(12)} ${fmtCost(totalBaseline).padEnd(12)}`,
   );
 
-  const escalated = entries.filter((e) => e.actual_model_name !== e.recommended_model_name);
-  if (escalated.length) {
+  const escalations = entries.filter((e) => e.deviation_type === "escalation");
+  const overrides = entries.filter((e) => e.deviation_type === "override");
+  if (escalations.length) {
     console.log(
-      `\n  ⚑ ${escalated.length} subtask(s) used a different model than recommended (escalation or override).`,
+      `\n  ⚑ ${escalations.length} subtask(s) escalated to a different model after the recommendation failed (--escalated).`,
+    );
+  }
+  if (overrides.length) {
+    console.log(
+      `  ⚠ ${overrides.length} subtask(s) used a different model than recommended, not reported as an escalation.`,
     );
   }
 

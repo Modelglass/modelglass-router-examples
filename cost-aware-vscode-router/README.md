@@ -133,6 +133,9 @@ always still clears the quality bar itself — escalating to a cheaper-in-theory
 model that fails the same threshold the original pick had to clear would be a
 worse recommendation, not a better one. If nothing in the pool qualifies as a
 next step, no escalation is suggested at all (see the worked example below).
+When you follow an escalation suggestion, log it with `npm run report --
+... --escalated` so it's tracked as its own category distinct from a plain
+override — see "Measuring real savings" below.
 
 ---
 
@@ -215,10 +218,29 @@ npm run report -- --task demo --subtask 1 \
   --actual-input 9500 --actual-output 2100
 ```
 
+If the actual model differs from the recommendation because you followed an
+**escalation** suggestion (the recommended model failed correctness review and
+you retried on the next model up the cost ladder), add `--escalated`:
+
+```bash
+# Recommended model failed review; escalated to Gemini 2.5 Pro per the
+# router's suggestion:
+npm run report -- --task demo --subtask 1 \
+  --model "Gemini 2.5 Pro" \
+  --actual-input 9500 --actual-output 2600 --escalated
+```
+
+Without `--escalated`, a different actual model is logged as an **override**
+instead — some other reason the caller used a different model, not a
+retry-after-failure. This distinction is tracked per entry
+(`deviation_type: "none" | "escalation" | "override"`) and reported as two
+separate categories by `npm run summary`, not folded into one generic
+"different model than recommended" bucket.
+
 Each call appends one line to `logs/routing-log.jsonl` (gitignored — stays local).
 The entry records: recommended model, estimated tokens/cost, actual model used,
-actual tokens, actual cost, and a hypothetical baseline (what those tokens would
-have cost at the most expensive model in the pool).
+actual tokens, actual cost, deviation type, and a hypothetical baseline (what
+those tokens would have cost at the most expensive model in the pool).
 
 Once you've logged a few subtasks, run the summary:
 
@@ -226,8 +248,9 @@ Once you've logged a few subtasks, run the summary:
 npm run summary
 ```
 
-This prints total actual spend, total estimated spend, and savings vs the
-hypothetical always-expensive-model baseline in both $ and %.
+This prints total actual spend, total estimated spend, savings vs the
+hypothetical always-expensive-model baseline in both $ and %, and separate
+counts of escalations vs overrides.
 
 **Why the router doesn't execute subtasks itself:** keeping N provider API keys
 out of this repo is an explicit goal. The report-back workflow (B2) lets real

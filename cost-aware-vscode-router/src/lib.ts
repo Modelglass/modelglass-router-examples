@@ -118,6 +118,19 @@ export interface NormalisedModel {
 // Types — log
 // ---------------------------------------------------------------------------
 
+/**
+ * Whether the actual model used differs from the recommendation, and if so,
+ * why (SCO-165 finding #6). "none" = actual matches recommended. "escalation"
+ * = the caller explicitly reported this as a retry-after-failure via
+ * `report --escalated` (route.ts's own "walk up the cost ladder on failure"
+ * concept, now with mechanical support instead of only a printed suggestion).
+ * "override" = actual differs from recommended but wasn't flagged as an
+ * escalation -- some other reason (caller preference, a model swap unrelated
+ * to correctness review, etc.). Previously both cases were indistinguishable
+ * (`actual_model_name !== recommended_model_name`).
+ */
+export type DeviationType = "none" | "escalation" | "override";
+
 export interface LogEntry {
   timestamp: string;
   task_description: string;
@@ -135,9 +148,20 @@ export interface LogEntry {
   actual_input_tokens: number;
   actual_output_tokens: number;
   actual_cost_usd: number;        // 0 if model not found in feed
+  deviation_type: DeviationType;
   baseline_model_name: string;    // most expensive model in pool at routing time
   baseline_cost_usd: number;      // actual tokens × baseline model prices
   delta_usd: number;              // actual_cost_usd − estimated_cost_usd
+}
+
+/** Derive deviation_type from whether models match and the --escalated flag. */
+export function deviationType(
+  recommendedName: string,
+  actualName: string,
+  escalatedFlag: boolean,
+): DeviationType {
+  if (recommendedName === actualName) return "none";
+  return escalatedFlag ? "escalation" : "override";
 }
 
 // ---------------------------------------------------------------------------
