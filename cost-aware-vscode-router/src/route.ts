@@ -90,15 +90,15 @@ function printRoutingTable(task: Task, models: NormalisedModel[]): void {
       : "";
   console.log(`\n  CODING MODEL POOL  (coding=strong, ranked by SWE-bench Verified${barLabel})\n`);
   console.log(
-    `  ${"Model".padEnd(28)} ${"SWE-bench Verified (source, type)".padEnd(36)} ${"Input/1M".padEnd(12)} Output/1M`,
+    `  ${"Model".padEnd(24)} ${"Provider".padEnd(18)} ${"SWE-bench Verified (source, type)".padEnd(36)} ${"Input/1M".padEnd(12)} Output/1M`,
   );
-  console.log("  " + "─".repeat(90));
+  console.log("  " + "─".repeat(108));
   for (const m of ranked) {
     const belowBar = !qualifying.includes(m);
     const marker = m === codingModel ? "← selected" : belowBar ? "✗ below quality bar" : "";
     const score = `${m.sweBenchVerified}%  (${m.sweBenchSource})`;
     console.log(
-      `  ${m.name.padEnd(28)} ${score.padEnd(36)} ${fmtPrice(m.inputPricePerM).padEnd(12)} ${fmtPrice(m.outputPricePerM)}  ${marker}`,
+      `  ${m.name.padEnd(24)} ${m.provider.padEnd(18)} ${score.padEnd(36)} ${fmtPrice(m.inputPricePerM).padEnd(12)} ${fmtPrice(m.outputPricePerM)}  ${marker}`,
     );
   }
   if (excluded.length) {
@@ -111,7 +111,7 @@ function printRoutingTable(task: Task, models: NormalisedModel[]): void {
   console.log("\n  WRITING/GENERAL MODEL  (instruction_following=strong|good, cheapest)\n");
   if (writingModel) {
     console.log(
-      `  ${writingModel.name}  ` +
+      `  ${writingModel.name} (${writingModel.provider})  ` +
         `Input ${fmtPrice(writingModel.inputPricePerM)}/1M  ` +
         `Output ${fmtPrice(writingModel.outputPricePerM)}/1M  ← selected`,
     );

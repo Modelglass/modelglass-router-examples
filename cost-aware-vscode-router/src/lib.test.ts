@@ -1,16 +1,20 @@
 /**
  * Tests for cost-aware-vscode-router's selection logic — in particular the
  * quality-bar filter (SCO-165 finding #1): `minSweBenchVerified` must
- * actually filter candidates, not just exist in the schema unread.
+ * actually filter candidates, not just exist in the schema unread; and host
+ * attribution (SCO-165 finding #3): normalise() must not discard which
+ * provider the selected offering came from.
  */
 
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  type ModelEntry,
   type NormalisedModel,
   type Task,
   codingQualityBar,
+  normalise,
   selectCodingModel,
   selectWritingModel,
 } from "./lib.js";
@@ -22,6 +26,7 @@ import {
 function makeModel(overrides: Partial<NormalisedModel> & { name: string }): NormalisedModel {
   return {
     slug: overrides.name.toLowerCase().replace(/\s+/g, "-"),
+    provider: "test-provider",
     qualityTier: "premium",
     codingRating: "strong",
     instrRating: null,
@@ -169,5 +174,85 @@ describe("selectWritingModel", () => {
     const writer = makeModel({ name: "Llama 4 Scout", instrRating: "strong", inputPricePerM: 0.1 });
     const selected = selectWritingModel([...POOL, writer]);
     assert.equal(selected, writer);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// normalise — host attribution (SCO-165 finding #3)
+// ---------------------------------------------------------------------------
+
+function makeModelEntry(overrides: Partial<ModelEntry> & { model_id: string }): ModelEntry {
+  return {
+    name: overrides.model_id,
+    offerings: [],
+    ...overrides,
+  };
+}
+
+describe("normalise", () => {
+  test("carries the provider of the selected (cheapest) offering", () => {
+    const entry = makeModelEntry({
+      model_id: "anthropic/claude-sonnet-5",
+      name: "Claude Sonnet 5",
+      offerings: [
+        {
+          slug: "claude-sonnet-5-anthropic",
+          provider: "anthropic",
+          quality_tier: "premium",
+          tiers: [
+            {
+              id: "input",
+              pricing: [{ amount: 3, currency: "USD", unit: "per_1m_tokens_input", effective_from: "2026-01-01" }],
+            },
+          ],
+        },
+      ],
+    });
+    const result = normalise(entry);
+    assert.equal(result.provider, "anthropic");
+  });
+
+  test("picks the cheapest offering's provider when a model has multiple hosts", () => {
+    // No current LLM model in the live feed has more than one offering
+    // (confirmed against the live feed on 2026-07-12), but normalise() must
+    // still get this right for any model that does -- image models commonly
+    // do, and this function's contract shouldn't assume LLM-only shape.
+    const entry = makeModelEntry({
+      model_id: "meta/llama-4-scout",
+      name: "Llama 4 Scout",
+      offerings: [
+        {
+          slug: "llama-4-scout-expensive-host",
+          provider: "expensive-host",
+          quality_tier: "fast",
+          tiers: [
+            {
+              id: "input",
+              pricing: [{ amount: 0.5, currency: "USD", unit: "per_1m_tokens_input", effective_from: "2026-01-01" }],
+            },
+          ],
+        },
+        {
+          slug: "llama-4-scout-cheap-host",
+          provider: "cheap-host",
+          quality_tier: "fast",
+          tiers: [
+            {
+              id: "input",
+              pricing: [{ amount: 0.1, currency: "USD", unit: "per_1m_tokens_input", effective_from: "2026-01-01" }],
+            },
+          ],
+        },
+      ],
+    });
+    const result = normalise(entry);
+    assert.equal(result.provider, "cheap-host");
+    assert.equal(result.inputPricePerM, 0.1);
+  });
+
+  test("provider is an empty string, not undefined/throwing, when a model has zero offerings", () => {
+    const entry = makeModelEntry({ model_id: "orphan/model", name: "Orphan Model" });
+    const result = normalise(entry);
+    assert.equal(result.provider, "");
   });
 });
