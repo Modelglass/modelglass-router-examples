@@ -106,7 +106,11 @@ carries provenance: a source URL and its type (`vendor` / `leaderboard` /
 `paper` / `independent`), which the routing table displays next to each score.
 Models with no curated SWE-bench Verified score are shown as excluded with the
 reason, not silently skipped — including the case where a model has a score
-for a *different* benchmark (SWE-bench Pro).
+for a *different* benchmark (SWE-bench Pro). Each offering in the feed carries
+its own `provider`; picking the cheapest offering means picking a specific
+*host*, not just a model, and the routing table names it — "same model,
+different host, different price" is a real Modelglass fact this tool doesn't
+discard on the way to a recommendation.
 
 If any coding subtask sets `minSweBenchVerified`, the router takes the
 **highest** threshold across all coding subtasks in the task (one model is
@@ -150,10 +154,10 @@ coding subtasks set `minSweBenchVerified: 65`:
 
   CODING MODEL POOL  (coding=strong, ranked by SWE-bench Verified, min. SWE-bench Verified 65%)
 
-  Model                        SWE-bench Verified (source, type)    Input/1M     Output/1M
-  ──────────────────────────────────────────────────────────────────────────────────────────
-  o4-mini                      68.1%  (openai.com, vendor)          $1.1         $4.4  ← selected
-  Gemini 2.5 Pro               63.8%  (deepmind.google, vendor)     $1.25        $10  ✗ below quality bar
+  Model                    Provider           SWE-bench Verified (source, type)    Input/1M     Output/1M
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  o4-mini                  openai             68.1%  (openai.com, vendor)          $1.1         $4.4  ← selected
+  Gemini 2.5 Pro           google-deepmind    63.8%  (deepmind.google, vendor)     $1.25        $10  ✗ below quality bar
 
   Excluded from the ranked pool:
   ✗ Claude Fable 5: no curated SWE-bench Verified score in the Modelglass registry
@@ -167,7 +171,7 @@ coding subtasks set `minSweBenchVerified: 65`:
 
   WRITING/GENERAL MODEL  (instruction_following=strong|good, cheapest)
 
-  Llama 4 Scout  Input $0.1/1M  Output $0.3/1M  ← selected
+  Llama 4 Scout (together-ai)  Input $0.1/1M  Output $0.3/1M  ← selected
 
 ────────────────────────────────────────────────────────────────────────────────
   ROUTING TABLE

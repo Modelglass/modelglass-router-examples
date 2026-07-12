@@ -73,6 +73,7 @@ export interface Tier {
 
 export interface Offering {
   slug: string;
+  provider: string;
   quality_tier: string;
   tiers: Tier[];
 }
@@ -95,6 +96,13 @@ export interface ApiResponse {
 export interface NormalisedModel {
   name: string;
   slug: string;
+  /**
+   * Which host serves the selected (cheapest) offering -- "same model,
+   * different host, different price" is a real Modelglass differentiator
+   * that normalise() previously discarded entirely (SCO-165 finding #3).
+   * Empty string only if a model somehow has zero offerings.
+   */
+  provider: string;
   qualityTier: string;
   codingRating: string | null;
   instrRating: string | null;
@@ -118,10 +126,12 @@ export interface LogEntry {
   subtask_tag: SubtaskTag;
   recommended_model_name: string;
   recommended_model_slug: string;
+  recommended_model_provider: string;
   estimated_input_tokens: number;
   estimated_output_tokens: number;
   estimated_cost_usd: number;
   actual_model_name: string;      // as supplied by caller
+  actual_model_provider: string;  // "" if model not found in feed
   actual_input_tokens: number;
   actual_output_tokens: number;
   actual_cost_usd: number;        // 0 if model not found in feed
@@ -201,6 +211,7 @@ export function normalise(m: ModelEntry): NormalisedModel {
   return {
     name: m.name,
     slug: offering?.slug ?? m.model_id,
+    provider: offering?.provider ?? "",
     qualityTier: offering?.quality_tier ?? "",
     codingRating,
     instrRating,

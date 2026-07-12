@@ -199,10 +199,12 @@ async function main(): Promise<void> {
     subtask_tag: subtask.tag,
     recommended_model_name: recommended?.name ?? "(none)",
     recommended_model_slug: recommended?.slug ?? "",
+    recommended_model_provider: recommended?.provider ?? "",
     estimated_input_tokens: estIn,
     estimated_output_tokens: estOut,
     estimated_cost_usd: estimatedCost,
     actual_model_name: actualModelEntry?.name ?? modelArg,
+    actual_model_provider: actualModelEntry?.provider ?? "",
     actual_input_tokens: actualInput,
     actual_output_tokens: actualOutput,
     actual_cost_usd: actualCost,
@@ -216,8 +218,11 @@ async function main(): Promise<void> {
   appendFileSync(LOG_PATH, JSON.stringify(entry) + "\n", "utf8");
 
   console.log(`\n  Logged subtask ${subtaskIndex}: "${subtask.description}"`);
-  console.log(`  Recommended: ${entry.recommended_model_name}`);
-  console.log(`  Actual:      ${entry.actual_model_name}  (${actualInput} in / ${actualOutput} out)`);
+  console.log(`  Recommended: ${entry.recommended_model_name} (${entry.recommended_model_provider})`);
+  console.log(
+    `  Actual:      ${entry.actual_model_name} (${entry.actual_model_provider || "unknown"})` +
+      `  (${actualInput} in / ${actualOutput} out)`,
+  );
   console.log(`  Est. cost:   $${estimatedCost.toFixed(5)}`);
   console.log(`  Actual cost: $${actualCost.toFixed(5)}`);
   console.log(`  Delta:       ${entry.delta_usd >= 0 ? "+" : ""}$${entry.delta_usd.toFixed(5)}`);
