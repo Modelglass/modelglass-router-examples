@@ -95,33 +95,54 @@ export async function fetchModelProfile(apiKey: string, modelId: string): Promis
   return { model_id: data.model_id, name: data.name, knowledge: data.knowledge };
 }
 
-/** Fields on `knowledge` that are provenance/licensing metadata, not useful for
- *  writing a generation prompt — dropped from the grounding context to keep it
- *  focused on what actually shapes a prompt. */
-const NON_PROMPT_FIELDS = new Set([
-  "schema_version",
-  "model_id",
-  "name",
-  "creator",
-  "training",
-  "benchmarks",
-  "citations",
-  "origin",
-  "license",
-  "ethical_notes",
-  "training_data_notes",
-  "capability_confidence",
+/**
+ * Fields on `knowledge` that actually shape a generation prompt — the rest
+ * (provenance, licensing, ids) is dropped by default. An explicit allowlist
+ * means a new registry field has to be added here deliberately to reach the
+ * prompt; the previous shape was a denylist of known-irrelevant fields, which
+ * meant any *new* field (added to either ontology schema after this file was
+ * written) would leak into the prompt unfiltered by default (SCO-165 finding
+ * #8). Sourced from both ontology schemas this tool reads knowledge from:
+ * `modelglass-video-gen`'s and `modelglass-audio`'s
+ * `ontology/schema/model-knowledge.schema.json`.
+ */
+const PROMPT_FIELDS = new Set([
+  // Shared across video + audio knowledge docs
+  "architecture",
+  "capability_profile",
+  "use_cases",
+  "routing_guidance",
+  "limitations",
+  "notes",
+  // Video-specific (modelglass-video-gen)
+  "max_clip_duration",
+  "supported_resolutions",
+  "fps_options",
+  "generation_modes",
+  "native_audio",
+  "api_availability",
+  "watermark",
+  // Audio-specific (modelglass-audio)
+  "sub_modality",
+  "benchmark_notes",
+  "features_and_differences",
+  "voice_cloning",
+  "ssml_support",
+  "streaming",
+  "voice_count",
+  "languages_supported",
 ]);
 
 /** Format one model's capability profile as a grounding-context block for the
- *  system prompt. Passes through whatever modality-specific fields exist
- *  (max_clip_duration, sub_modality, etc.) rather than hardcoding a schema —
+ *  system prompt. Only fields on the PROMPT_FIELDS allowlist pass through —
  *  video and audio ontology entries carry different top-level fields beyond
- *  the shared capability_profile/use_cases/routing_guidance/limitations shape. */
+ *  the shared capability_profile/use_cases/routing_guidance/limitations
+ *  shape, and both are covered above; a field neither schema defines yet is
+ *  excluded until someone adds it here on purpose. */
 export function formatGroundingContext(profile: ModelProfile, mediaLabel: "video" | "audio"): string {
   const knowledge = profile.knowledge as Record<string, unknown>;
   const filtered = Object.fromEntries(
-    Object.entries(knowledge).filter(([key]) => !NON_PROMPT_FIELDS.has(key)),
+    Object.entries(knowledge).filter(([key]) => PROMPT_FIELDS.has(key)),
   );
   return `### ${profile.name} (${profile.model_id}) — ${mediaLabel} model\n\n${JSON.stringify(filtered, null, 2)}`;
 }

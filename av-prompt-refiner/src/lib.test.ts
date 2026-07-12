@@ -1,6 +1,8 @@
 /**
  * Tests for av-prompt-refiner's grounding-context formatting (SCO-165
- * finding #7 — this example previously had no test suite at all).
+ * finding #7 — this example previously had no test suite at all; SCO-165
+ * finding #8 — PROMPT_FIELDS is an explicit allowlist, not a denylist of
+ * known-irrelevant fields).
  */
 
 import { describe, test } from "node:test";
@@ -44,7 +46,7 @@ describe("formatGroundingContext", () => {
     assert.deepEqual(jsonBlock, { capability_profile: { realism: "strong" } });
   });
 
-  test("passes through modality-specific fields it doesn't know about", () => {
+  test("passes through known video-specific fields on the allowlist", () => {
     const profile = makeProfile({
       capability_profile: { realism: "strong" },
       max_clip_duration: "10s",
@@ -54,6 +56,21 @@ describe("formatGroundingContext", () => {
     const jsonBlock = JSON.parse(result.split("\n\n")[1]!);
     assert.equal(jsonBlock.max_clip_duration, "10s");
     assert.deepEqual(jsonBlock.supported_resolutions, ["1080p", "4k"]);
+  });
+
+  test("drops a field neither ontology schema defines, even though it isn't a known provenance field", () => {
+    // The core allowlist-vs-denylist behaviour change (SCO-165 finding #8):
+    // a brand-new registry field must be added to PROMPT_FIELDS on purpose
+    // to reach the prompt -- it doesn't leak in just by not being on a
+    // list of things to exclude.
+    const profile = makeProfile({
+      capability_profile: { realism: "strong" },
+      some_future_registry_field: "not yet known to this tool",
+    });
+    const result = formatGroundingContext(profile, "video");
+    const jsonBlock = JSON.parse(result.split("\n\n")[1]!);
+    assert.equal("some_future_registry_field" in jsonBlock, false);
+    assert.ok("capability_profile" in jsonBlock);
   });
 
   test("audio-specific fields pass through the same way", () => {
