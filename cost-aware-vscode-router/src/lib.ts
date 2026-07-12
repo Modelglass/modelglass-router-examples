@@ -12,7 +12,18 @@ export type SubtaskTag = "coding" | "writing" | "general";
 export interface Subtask {
   description: string;
   tag: SubtaskTag;
-  qualityBar?: string;
+  /**
+   * Minimum SWE-bench Verified score (0-100) a coding-tagged subtask requires
+   * of its selected model. Ignored for non-coding subtasks. Omit for no
+   * threshold (any confirmed-score model qualifies, the pre-SCO-165 default
+   * behaviour). Replaces the old free-text `qualityBar: string` field, which
+   * was never read by selection logic (SCO-165 finding #1) -- a numeric
+   * threshold against the same structured `knowledge.benchmarks` field
+   * `selectCodingModel` already ranks by is the one comparison this router
+   * can actually make; a prose rubric would need the tool to run the task
+   * and grade the output, which it doesn't do.
+   */
+  minSweBenchVerified?: number;
   estimatedInputTokens?: number;
   estimatedOutputTokens?: number;
 }
@@ -207,12 +218,31 @@ export function normalise(m: ModelEntry): NormalisedModel {
 
 export interface CodingSelection {
   selected: NormalisedModel | null;
-  ranked: NormalisedModel[];            // sorted desc by SWE-bench Verified
+  ranked: NormalisedModel[];            // every confirmed-score model, sorted desc by SWE-bench Verified
+  qualifying: NormalisedModel[];        // ranked models that also clear minSweBenchVerified
   excluded: { model: NormalisedModel; reason: string }[];
   mostExpensive: NormalisedModel | null;
+  minSweBenchVerified: number | null;   // the threshold actually applied, for display
 }
 
-export function selectCodingModel(models: NormalisedModel[]): CodingSelection {
+/**
+ * Highest `minSweBenchVerified` set across a task's coding-tagged subtasks,
+ * or null if none set any threshold. `selectCodingModel` picks one model for
+ * every coding subtask (SCO-165's noted "one model globally" architecture is
+ * unchanged by this fix), so the strictest bar among them is the one the
+ * shared selection has to clear.
+ */
+export function codingQualityBar(task: Task): number | null {
+  const bars = task.subtasks
+    .filter((s) => s.tag === "coding" && s.minSweBenchVerified !== undefined)
+    .map((s) => s.minSweBenchVerified!);
+  return bars.length ? Math.max(...bars) : null;
+}
+
+export function selectCodingModel(
+  models: NormalisedModel[],
+  minSweBenchVerified: number | null = null,
+): CodingSelection {
   const strong = models.filter((m) => m.codingRating === "strong");
   const ranked: NormalisedModel[] = [];
   const excluded: { model: NormalisedModel; reason: string }[] = [];
@@ -238,18 +268,40 @@ export function selectCodingModel(models: NormalisedModel[]): CodingSelection {
     return d !== 0 ? d : (a.inputPricePerM ?? Infinity) - (b.inputPricePerM ?? Infinity);
   });
 
-  const cheapestFirst = [...ranked].sort(
+  // Quality-bar filter (SCO-165 finding #1): a confirmed score is necessary
+  // but not sufficient — it must also clear the task's stated minimum. Models
+  // that rank but fall short move from "ranked" to "excluded" with a reason
+  // naming the actual gap, rather than silently losing on price alone.
+  const qualifying = ranked.filter(
+    (m) => minSweBenchVerified === null || (m.sweBenchVerified ?? 0) >= minSweBenchVerified,
+  );
+  if (minSweBenchVerified !== null) {
+    for (const m of ranked) {
+      if (!qualifying.includes(m)) {
+        excluded.push({
+          model: m,
+          reason: `SWE-bench Verified ${m.sweBenchVerified}% is below the required threshold of ${minSweBenchVerified}%`,
+        });
+      }
+    }
+  }
+
+  const cheapestFirst = [...qualifying].sort(
     (a, b) => (a.inputPricePerM ?? Infinity) - (b.inputPricePerM ?? Infinity),
   );
   const selected = cheapestFirst[0] ?? null;
 
-  // Most expensive model in the entire pool (for baseline calculation)
+  // Most expensive model in the entire pool (for baseline calculation) —
+  // deliberately over the full ranked+excluded set, not just qualifying
+  // ones: the baseline represents "most expensive option a caller might
+  // have picked without this tool," which shouldn't shrink just because a
+  // quality bar narrowed the recommended pool.
   const allStrong = [...ranked, ...excluded.map((e) => e.model)];
   const mostExpensive = allStrong.sort(
     (a, b) => (b.inputPricePerM ?? 0) - (a.inputPricePerM ?? 0),
   )[0] ?? null;
 
-  return { selected, ranked, excluded, mostExpensive };
+  return { selected, ranked, qualifying, excluded, mostExpensive, minSweBenchVerified };
 }
 
 export function selectWritingModel(models: NormalisedModel[]): NormalisedModel | null {

@@ -15,6 +15,7 @@ import {
   fetchLLMModels,
   selectCodingModel,
   selectWritingModel,
+  codingQualityBar,
   estimateCost,
   fmtCost,
   fmtPrice,
@@ -35,16 +36,18 @@ const DEMO_TASK: Task = {
     {
       description: "Implement rate-limit middleware (Upstash KV, 429/Retry-After)",
       tag: "coding",
-      qualityBar:
-        "Must correctly handle Redis KV serialisation patterns already used in the codebase; no hallucinated APIs.",
+      // Moderately demanding real-world SWE task, not a frontier-tier bar —
+      // 65 excludes the current pool's weaker scored candidate while still
+      // being clearable by more than one model (SCO-165 finding #1; value
+      // chosen against the live feed on 2026-07-12, see README).
+      minSweBenchVerified: 65,
       estimatedInputTokens: 10_000,
       estimatedOutputTokens: 2_500,
     },
     {
       description: "Write unit tests (pass/reject/tier-boundary)",
       tag: "coding",
-      qualityBar:
-        "Must correctly handle Redis KV serialisation patterns already used in the codebase; no hallucinated APIs.",
+      minSweBenchVerified: 65,
       estimatedInputTokens: 8_000,
       estimatedOutputTokens: 2_000,
     },
@@ -68,7 +71,11 @@ const DEMO_TASK: Task = {
 // ---------------------------------------------------------------------------
 
 function printRoutingTable(task: Task, models: NormalisedModel[]): void {
-  const { selected: codingModel, ranked, excluded } = selectCodingModel(models);
+  const minSweBenchVerified = codingQualityBar(task);
+  const { selected: codingModel, ranked, qualifying, excluded } = selectCodingModel(
+    models,
+    minSweBenchVerified,
+  );
   const writingModel = selectWritingModel(models);
 
   console.log("\n" + hr());
@@ -77,13 +84,18 @@ function printRoutingTable(task: Task, models: NormalisedModel[]): void {
   console.log(`  Task: ${task.description}`);
   console.log(hr());
 
-  console.log("\n  CODING MODEL POOL  (coding=strong, ranked by SWE-bench Verified)\n");
+  const barLabel =
+    minSweBenchVerified !== null
+      ? `, min. SWE-bench Verified ${minSweBenchVerified}%`
+      : "";
+  console.log(`\n  CODING MODEL POOL  (coding=strong, ranked by SWE-bench Verified${barLabel})\n`);
   console.log(
     `  ${"Model".padEnd(28)} ${"SWE-bench Verified (source, type)".padEnd(36)} ${"Input/1M".padEnd(12)} Output/1M`,
   );
   console.log("  " + "─".repeat(90));
   for (const m of ranked) {
-    const marker = m === codingModel ? "← selected" : "";
+    const belowBar = !qualifying.includes(m);
+    const marker = m === codingModel ? "← selected" : belowBar ? "✗ below quality bar" : "";
     const score = `${m.sweBenchVerified}%  (${m.sweBenchSource})`;
     console.log(
       `  ${m.name.padEnd(28)} ${score.padEnd(36)} ${fmtPrice(m.inputPricePerM).padEnd(12)} ${fmtPrice(m.outputPricePerM)}  ${marker}`,
@@ -133,8 +145,11 @@ function printRoutingTable(task: Task, models: NormalisedModel[]): void {
     `  ${"".padEnd(3)} ${"".padEnd(50)} ${"".padEnd(10)} ${"".padEnd(20)} ${"".padEnd(10)} ${"Total".padEnd(10)} ${fmtCost(totalCost)}`,
   );
 
-  if (codingModel && ranked.length > 1) {
-    const next = ranked.find(
+  if (codingModel && qualifying.length > 1) {
+    // Escalation must stay within the quality-bar-qualifying pool -- offering
+    // a cheaper-than-o4-mini-in-theory step up that itself fails the bar
+    // would be a worse recommendation than the one being escalated from.
+    const next = qualifying.find(
       (m) => m !== codingModel && (m.inputPricePerM ?? 0) > (codingModel.inputPricePerM ?? 0),
     );
     if (next) {
