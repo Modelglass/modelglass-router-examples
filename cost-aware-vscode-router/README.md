@@ -68,7 +68,7 @@ node --import tsx/esm cost-aware-vscode-router/src/route.ts my-task.json
     {
       "description": "Write the auth middleware",
       "tag": "coding",
-      "qualityBar": "Must handle JWT edge cases correctly",
+      "minSweBenchVerified": 65,
       "estimatedInputTokens": 8000,
       "estimatedOutputTokens": 2000
     },
@@ -83,7 +83,11 @@ node --import tsx/esm cost-aware-vscode-router/src/route.ts my-task.json
 ```
 
 Tags: `coding` (write/edit/debug code), `writing` (prose), `general` (anything else).  
-Token estimates are optional — omit them to skip cost projection.
+Token estimates are optional — omit them to skip cost projection.  
+`minSweBenchVerified` is optional (0-100). Coding subtasks with it set only
+consider models whose curated SWE-bench Verified score clears the threshold —
+omit it to fall back to "any confirmed-score model qualifies." A model with no
+curated score at all is still excluded either way (see "How it works").
 
 ---
 
@@ -100,23 +104,39 @@ curated in the Modelglass coding-capability registry — the same data behind
 [modelglass.com.au/coding](https://modelglass.com.au/coding) — and every entry
 carries provenance: a source URL and its type (`vendor` / `leaderboard` /
 `paper` / `independent`), which the routing table displays next to each score.
-Select the cheapest ranked candidate. Models with no curated SWE-bench Verified
-score are shown as excluded with the reason, not silently skipped — including
-the case where a model has a score for a *different* benchmark (SWE-bench Pro).
+Models with no curated SWE-bench Verified score are shown as excluded with the
+reason, not silently skipped — including the case where a model has a score
+for a *different* benchmark (SWE-bench Pro).
+
+If any coding subtask sets `minSweBenchVerified`, the router takes the
+**highest** threshold across all coding subtasks in the task (one model is
+still selected for every coding subtask — see "What's not here" — so it has to
+clear the strictest bar any of them set) and filters the ranked pool down to
+models whose score meets or exceeds it *before* picking cheapest. A model with
+a real, confirmed score that still falls short is marked `✗ below quality bar`
+in the table and named explicitly in the exclusion list with its actual score
+and the required threshold — it's a genuine filter, not a description. Omit
+`minSweBenchVerified` entirely to fall back to the original behaviour (any
+confirmed-score model qualifies, cheapest wins).
 
 **Writing / general subtasks** — filter `instruction_following in [strong, good]`,
 ignore the coding filter entirely. Select the cheapest qualifying model.
 
 **Escalation** — if a coding subtask fails correctness review, retry on the
 next model up the ranked pool's cost ladder. Walk up one step at a time;
-don't jump straight to the most expensive option.
+don't jump straight to the most expensive option. The suggested next step
+always still clears the quality bar itself — escalating to a cheaper-in-theory
+model that fails the same threshold the original pick had to clear would be a
+worse recommendation, not a better one. If nothing in the pool qualifies as a
+next step, no escalation is suggested at all (see the worked example below).
 
 ---
 
-## Worked example — rate-limiting middleware (2026-07-09)
+## Worked example — rate-limiting middleware (2026-07-12)
 
-This is the output of `npm run demo` against the live feed on 2026-07-09 (the
-model pool moves as the registry does — your run may differ):
+This is the output of `npm run demo` against the live feed on 2026-07-12 (the
+model pool moves as the registry does — your run may differ). The demo task's
+coding subtasks set `minSweBenchVerified: 65`:
 
 **Task:** Add per-endpoint rate limiting middleware to the Modelglass API
 (Redis KV, 429/Retry-After, unit tests, PR description, Slack summary).
@@ -128,21 +148,22 @@ model pool moves as the registry does — your run may differ):
   Task: Add per-endpoint rate limiting middleware to the Modelglass API (Redis KV, 429/Retry-After, unit tests, PR description, Slack summary).
 ────────────────────────────────────────────────────────────────────────────────
 
-  CODING MODEL POOL  (coding=strong, ranked by SWE-bench Verified)
+  CODING MODEL POOL  (coding=strong, ranked by SWE-bench Verified, min. SWE-bench Verified 65%)
 
   Model                        SWE-bench Verified (source, type)    Input/1M     Output/1M
   ──────────────────────────────────────────────────────────────────────────────────────────
   o4-mini                      68.1%  (openai.com, vendor)          $1.1         $4.4  ← selected
-  Gemini 2.5 Pro               63.8%  (deepmind.google, vendor)     $1.25        $10  
+  Gemini 2.5 Pro               63.8%  (deepmind.google, vendor)     $1.25        $10  ✗ below quality bar
 
   Excluded from the ranked pool:
   ✗ Claude Fable 5: no curated SWE-bench Verified score in the Modelglass registry
   ✗ Claude Sonnet 5: has a curated SWE-bench Pro score (different benchmark) — not SWE-bench Verified
   ✗ Gemini 3.1 Pro: no curated SWE-bench Verified score in the Modelglass registry
   ✗ Gemini 3.5 Flash: no curated SWE-bench Verified score in the Modelglass registry
-  ✗ GPT-5.5: no curated SWE-bench Verified score in the Modelglass registry
+  ✗ GPT-5.6 Sol: no curated SWE-bench Verified score in the Modelglass registry
   ✗ Mistral Large 3: no curated SWE-bench Verified score in the Modelglass registry
   ✗ Qwen 3 235B-A22B: no curated SWE-bench Verified score in the Modelglass registry
+  ✗ Gemini 2.5 Pro: SWE-bench Verified 63.8% is below the required threshold of 65%
 
   WRITING/GENERAL MODEL  (instruction_following=strong|good, cheapest)
 
@@ -160,19 +181,21 @@ model pool moves as the registry does — your run may differ):
   ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
                                                                                                     Total      $0.040
 
-  Escalation: if coding subtasks fail correctness review → retry on Gemini 2.5 Pro (SWE-bench Verified 63.8%, $1.25/1M input)
-
 ────────────────────────────────────────────────────────────────────────────────
 ```
 
-**Why o4-mini?** In the current ranked pool it has both the highest curated
-SWE-bench Verified score (68.1%) and the cheapest input price ($1.10/1M), so
-cheapest-ranked selection picks it outright — no score/price tradeoff arises on
-today's data. Note the provenance column: both ranked scores are
-vendor-published numbers (`openai.com`, `deepmind.google`), shown as such
-rather than laundered into unqualified facts, and Claude Sonnet 5's exclusion
-names the actual data condition (a SWE-bench **Pro** score is not a SWE-bench
-**Verified** score).
+**Why o4-mini, and why no escalation line?** o4-mini (68.1%) clears the 65%
+bar and is the cheapest input price in the pool ($1.10/1M) — cheapest-ranked
+selection picks it outright. Gemini 2.5 Pro is genuinely excluded, not just
+out-ranked: its real curated score (63.8%) is below the threshold, named
+explicitly with both numbers rather than silently losing on price. That's also
+why no escalation suggestion appears this run — on today's data, Gemini 2.5
+Pro is the only other confirmed-score candidate, and it doesn't qualify either,
+so there's honestly nothing to escalate to. Note the provenance column: both
+scores are vendor-published numbers (`openai.com`, `deepmind.google`), shown
+as such rather than laundered into unqualified facts, and Claude Sonnet 5's
+exclusion names the actual data condition (a SWE-bench **Pro** score is not a
+SWE-bench **Verified** score).
 
 ---
 

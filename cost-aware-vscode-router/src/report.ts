@@ -17,6 +17,7 @@ import {
   fetchLLMModels,
   selectCodingModel,
   selectWritingModel,
+  codingQualityBar,
   estimateCost,
   mostExpensiveInPool,
   requireApiKey,
@@ -95,12 +96,14 @@ const DEMO_TASK: Task = {
     {
       description: "Implement rate-limit middleware (Upstash KV, 429/Retry-After)",
       tag: "coding",
+      minSweBenchVerified: 65,
       estimatedInputTokens: 10_000,
       estimatedOutputTokens: 2_500,
     },
     {
       description: "Write unit tests (pass/reject/tier-boundary)",
       tag: "coding",
+      minSweBenchVerified: 65,
       estimatedInputTokens: 8_000,
       estimatedOutputTokens: 2_000,
     },
@@ -155,7 +158,7 @@ async function main(): Promise<void> {
   const models = await fetchLLMModels(apiKey);
   console.log(`  ${models.length} models loaded.`);
 
-  const { selected: codingModel } = selectCodingModel(models);
+  const { selected: codingModel } = selectCodingModel(models, codingQualityBar(task));
   const writingModel = selectWritingModel(models);
   const recommended = subtask.tag === "coding" ? codingModel : writingModel;
 
