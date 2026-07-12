@@ -14,7 +14,7 @@
     "watch": "node --import tsx/esm stack-watch/src/watch.ts",
     "cost": "node --import tsx/esm image-batch-coster/src/cost.ts",
     "check": "node --import tsx/esm switch-check/src/check.ts",
-    "test": "node --import tsx/esm --test cost-aware-vscode-router/src/*.test.ts stack-watch/src/*.test.ts image-batch-coster/src/*.test.ts switch-check/src/*.test.ts"
+    "test": "node --import tsx/esm --test cost-aware-vscode-router/src/*.test.ts av-prompt-refiner/src/*.test.ts stack-watch/src/*.test.ts image-batch-coster/src/*.test.ts switch-check/src/*.test.ts"
   },
   "engines": {
     "node": ">=20"

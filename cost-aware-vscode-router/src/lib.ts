@@ -33,6 +33,52 @@ export interface Task {
   subtasks: Subtask[];
 }
 
+/**
+ * Built-in demo task (rate-limiting middleware — from
+ * sco-139-orchestrator-routing-design.md §4). Single source of truth for
+ * `--demo`/`--task demo` across route.ts and report.ts — previously each
+ * file hardcoded its own copy and the two had already drifted (SCO-165
+ * finding #7: `minSweBenchVerified` present on one copy, absent on the
+ * other, after finding #1's fix touched only route.ts's copy first).
+ */
+export const DEMO_TASK: Task = {
+  description:
+    "Add per-endpoint rate limiting middleware to the Modelglass API " +
+    "(Redis KV, 429/Retry-After, unit tests, PR description, Slack summary).",
+  subtasks: [
+    {
+      description: "Implement rate-limit middleware (Upstash KV, 429/Retry-After)",
+      tag: "coding",
+      // Moderately demanding real-world SWE task, not a frontier-tier bar —
+      // 65 excludes the current pool's weaker scored candidate while still
+      // being clearable by more than one model (SCO-165 finding #1; value
+      // chosen against the live feed on 2026-07-12, see README).
+      minSweBenchVerified: 65,
+      estimatedInputTokens: 10_000,
+      estimatedOutputTokens: 2_500,
+    },
+    {
+      description: "Write unit tests (pass/reject/tier-boundary)",
+      tag: "coding",
+      minSweBenchVerified: 65,
+      estimatedInputTokens: 8_000,
+      estimatedOutputTokens: 2_000,
+    },
+    {
+      description: "Write PR description explaining the change and testing approach",
+      tag: "writing",
+      estimatedInputTokens: 3_000,
+      estimatedOutputTokens: 500,
+    },
+    {
+      description: "Write Slack summary for the team announcing the change",
+      tag: "writing",
+      estimatedInputTokens: 2_000,
+      estimatedOutputTokens: 200,
+    },
+  ],
+};
+
 // ---------------------------------------------------------------------------
 // Types — Modelglass feed
 // ---------------------------------------------------------------------------

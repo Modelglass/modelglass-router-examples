@@ -14,6 +14,7 @@ import { readFileSync, appendFileSync, mkdirSync } from "node:fs";
 import {
   type Task,
   type LogEntry,
+  DEMO_TASK,
   fetchLLMModels,
   selectCodingModel,
   selectWritingModel,
@@ -91,44 +92,6 @@ function parseArgs(argv: string[]): {
     escalated,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Demo task (kept in sync with route.ts)
-// ---------------------------------------------------------------------------
-
-const DEMO_TASK: Task = {
-  description:
-    "Add per-endpoint rate limiting middleware to the Modelglass API " +
-    "(Redis KV, 429/Retry-After, unit tests, PR description, Slack summary).",
-  subtasks: [
-    {
-      description: "Implement rate-limit middleware (Upstash KV, 429/Retry-After)",
-      tag: "coding",
-      minSweBenchVerified: 65,
-      estimatedInputTokens: 10_000,
-      estimatedOutputTokens: 2_500,
-    },
-    {
-      description: "Write unit tests (pass/reject/tier-boundary)",
-      tag: "coding",
-      minSweBenchVerified: 65,
-      estimatedInputTokens: 8_000,
-      estimatedOutputTokens: 2_000,
-    },
-    {
-      description: "Write PR description explaining the change and testing approach",
-      tag: "writing",
-      estimatedInputTokens: 3_000,
-      estimatedOutputTokens: 500,
-    },
-    {
-      description: "Write Slack summary for the team announcing the change",
-      tag: "writing",
-      estimatedInputTokens: 2_000,
-      estimatedOutputTokens: 200,
-    },
-  ],
-};
 
 // ---------------------------------------------------------------------------
 // Main
