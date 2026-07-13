@@ -313,4 +313,10 @@ side by side.
 
 ---
 
+---
+
+_Repo note: merges to this repo's `main` now publish to modelglass.com.au/routers
+automatically (SCO-197, 2026-07-13) — no manual nudge to the main site repo
+required._
+
 Copyright © 2026 Modelglass Pty Ltd. Licensed under the MIT License — see [LICENSE](../LICENSE).
