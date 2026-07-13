@@ -27,3 +27,24 @@ jobs:
         run: npx tsc --noEmit
       - name: Run tests (all examples)
         run: npm test
+
+  # SCO-197: the modelglass site fetches this repo's READMEs live at build
+  # time via the GitHub Contents API (apps/web/src/lib/router-examples.ts) —
+  # unlike the other sibling data repos, nothing here is mirrored into a
+  # modelglass-main commit, so a merge to this repo's main previously never
+  # triggered a site rebuild. Content only went live on modelglass main's
+  # *next unrelated* deploy (confirmed stale twice on 2026-07-12: SCO-165's
+  # 5 PRs and SCO-190's shot-plan-compiler both sat live-but-unpublished
+  # until an unrelated docs commit happened to redeploy the site). This job
+  # closes that gap by firing the modelglass site's Vercel deploy hook
+  # directly whenever main here changes and passes validate.
+  deploy-site:
+    name: Trigger modelglass site rebuild
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fire Vercel deploy hook
+        env:
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: curl -fsS -X POST "$VERCEL_DEPLOY_HOOK_URL" -o /dev/null
