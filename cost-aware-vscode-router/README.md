@@ -252,19 +252,34 @@ This prints total actual spend, total estimated spend, savings vs the
 hypothetical always-expensive-model baseline in both $ and %, and separate
 counts of escalations vs overrides.
 
-**Why the router doesn't execute subtasks itself:** keeping N provider API keys
-out of this repo is an explicit goal. The report-back workflow (B2) lets real
-token counts flow in from whatever tool you actually used — Claude Code, a
-custom agent, direct API calls — without this repo needing credentials for any
-of them.
+**Why the router doesn't execute subtasks itself:** this stays a minimal,
+zero-provider-credential reference implementation by design, not because
+execution is rejected as a goal — execution now genuinely exists, just
+elsewhere. [`modelglass-vscode` 0.3.0+](https://github.com/Modelglass/modelglass-vscode/releases/tag/v0.3.0)
+(Marketplace: [`modelglass.cost-aware-router`](https://marketplace.visualstudio.com/items?itemName=modelglass.cost-aware-router))
+ships a `Run Task` command that ranks the same way this script does, then
+calls the top-ranked model directly using a provider key you supply (BYOK —
+Starter: one key; Pro: multiple keys with automatic fallback). That execution
+layer is original code in `modelglass-vscode`
+([`src/routing-engine.ts`, `src/run-task*.ts`, `src/provider-*.ts` — see its
+README](https://github.com/Modelglass/modelglass-vscode#relationship-to-cost-aware-vscode-router)),
+not built on this repo. This script — and the extension's separate,
+still-recommend-only `Route Task` command that vendors it — intentionally
+keeps zero provider credentials, so the report-back workflow below (B2) is
+what lets real token counts flow in from whatever tool you actually used to
+run each subtask: Claude Code, a custom agent, direct API calls, or now
+`Run Task` itself.
 
 ---
 
 ## What's not here (intentional)
 
 - **Token-spend measurement/tracking** — deferred; see SCO-139.
-- **VS Code extension** — surface layer, builds on top of this script.
-- **MCP tool** — same.
+- **VS Code extension** — `Route Task`'s ranking is surface layer, vendoring
+  this script directly; its separate `Run Task` command (0.3.0+) adds
+  independent execution using your own provider key, not built on this repo —
+  see "Why the router doesn't execute subtasks itself" above.
+- **MCP tool** — same (surface layer, not yet built — SCO-235).
 - **Task decomposition** — the caller tags subtasks at decomposition time.
   No router-calling-a-router.
 
