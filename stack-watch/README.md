@@ -28,11 +28,11 @@ silently miss real price changes that fell outside the window, or report
 "no drift" when the window just didn't reach back far enough — worse than
 not running at all.
 
-stack-watch checks the calling key's actual tier via `GET /v1/keys` before
-attempting anything — not a guess based on the `mg_free_`/`mg_starter_`/
-`mg_pro_` key-string prefix, but the tier the account was actually
-provisioned at. On Free, it exits immediately with that explanation and a
-link to upgrade. It does not run in a caveated/degraded mode.
+stack-watch checks the calling key's actual tier via the `modelglass_get_account`
+MCP tool before attempting anything — not a guess based on the `mg_free_`/
+`mg_starter_`/`mg_pro_` key-string prefix, but the tier the account was
+actually provisioned at. On Free, it exits immediately with that explanation
+and a link to upgrade. It does not run in a caveated/degraded mode.
 
 ---
 
@@ -116,8 +116,8 @@ straight into cron/CI without extra plumbing.
 
 ## How it works
 
-1. Checks the key's tier via `GET /v1/keys` — exits immediately on Free
-   (see above).
+1. Checks the key's tier via the `modelglass_get_account` MCP tool — exits
+   immediately on Free (see above).
 2. Fetches every model in the stack via one `GET /v1/models` call (the bulk
    response has the same per-model shape as `GET /v1/models/:modelId`, so
    one fetch covers a cross-modality stack regardless of size).
@@ -130,8 +130,8 @@ straight into cron/CI without extra plumbing.
      (current → previous).
    - **Capability** — any `capability_profile` dimension whose rating
      changed (e.g. `coding: strong → good`).
-4. For each stack model rated `"strong"` on any dimension, checks
-   `GET /v1/models/:modelId/competitors` for cheaper alternatives, then
+4. For each stack model rated `"strong"` on any dimension, checks the
+   `modelglass_get_competitors` MCP tool for cheaper alternatives, then
    fetches each cheaper candidate's own `capability_profile` and suggests a
    switch only when the candidate matches `"strong"` on the same dimension —
    citing the specific fields (`capability_profile.<dimension>`,

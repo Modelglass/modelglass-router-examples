@@ -1,12 +1,14 @@
 /**
  * Modelglass feed fetching, tier gating, and drift computation for stack-watch.
  *
- * Uses the plain REST feed (GET /v1/models, GET /v1/keys,
- * GET /v1/models/:modelId/competitors) rather than the MCP endpoint — the
- * two capabilities this tool needs (tier introspection via /v1/keys, and
- * competitor lookups via /v1/models/:modelId/competitors) aren't exposed by
- * any of the four MCP tools, so there's no MCP-only path available here,
- * unlike av-prompt-refiner's deliberate MCP-transport choice.
+ * SCO-338 follow-on: tier introspection and competitor lookups now go over
+ * the MCP endpoint (`POST /mcp`, tools `modelglass_get_account` and
+ * `modelglass_get_competitors`) instead of REST — those two tools shipped in
+ * PR #307 specifically to close the gap this file used to document (neither
+ * capability was exposed by any of the original four MCP tools). The bulk
+ * model list still uses the plain REST feed (`GET /v1/models`) — no MCP tool
+ * returns the full cross-modality listing this tool needs for drift
+ * comparison, so that part stays on REST.
  */
 
 // ---------------------------------------------------------------------------
@@ -85,16 +87,18 @@ interface ApiListResponse {
   error?: { code: string; message: string };
 }
 
-export interface KeyRecord {
+/** Shape of `modelglass_get_account`'s `data` — the calling credential's own
+ *  account record (tier includes "app" for the iOS app key type; SCO-174).
+ *  Scoped to exactly the calling key, unlike the old GET /v1/keys response
+ *  this replaces, which returned every key on the account as a list. */
+export interface AccountInfo {
   keyId: string;
-  tier: "free" | "starter" | "pro" | "internal";
+  tier: "free" | "app" | "starter" | "pro" | "internal";
   status: string;
-}
-
-interface KeysResponse {
-  ok: boolean;
-  data: KeyRecord[];
-  error?: { code: string; message: string };
+  label?: string;
+  createdAt?: string;
+  expiresAt?: string;
+  lastUsedAt?: string;
 }
 
 export interface CompetitorEntry {
@@ -107,20 +111,22 @@ export interface CompetitorEntry {
   notes: string | null;
 }
 
-interface CompetitorsResponse {
-  ok: boolean;
-  data: { model_id: string; competitors: CompetitorEntry[] };
-  error?: { code: string; message: string };
+interface CompetitorsResult {
+  model_id: string;
+  source_slug: string | null;
+  competitors: CompetitorEntry[];
 }
 
 // ---------------------------------------------------------------------------
-// Modelglass API
+// Modelglass REST API — still used for the bulk model list only (see the
+// file-level comment above for why this one call stays on REST)
 // ---------------------------------------------------------------------------
 
 // Override for pointing at a local/self-hosted API instance (e.g. `pnpm dev:api`
 // in the main modelglass repo) — used to verify this tool against a Starter/Pro
 // dev key without touching production billing. Unset in normal use; defaults to
-// the live production API.
+// the live production API. Also the base for the /mcp endpoint below — same
+// host, same auth, just a different path.
 export const MODELGLASS_API = process.env["MODELGLASS_API_URL"] || "https://modelglass-api.vercel.app";
 
 async function apiGet<T>(path: string, apiKey: string): Promise<T> {
@@ -145,12 +151,71 @@ export async function fetchAllModels(apiKey: string): Promise<ModelEntry[]> {
   return json.data;
 }
 
+// ---------------------------------------------------------------------------
+// Modelglass MCP endpoint — account + competitor lookups (SCO-338)
+// ---------------------------------------------------------------------------
+
+interface McpToolEnvelope<T> {
+  schema_version: number;
+  artifact_version: number;
+  built_at: string;
+  ok: boolean;
+  data?: T;
+  error?: { code: string; message: string };
+}
+
+interface McpJsonRpcResponse {
+  jsonrpc: "2.0";
+  id: number | string | null;
+  result?: { content: { type: string; text: string }[]; structuredContent: unknown; isError: boolean };
+  error?: { code: number; message: string; data?: unknown };
+}
+
+let mcpRequestId = 0;
+
+/** Calls one Modelglass MCP tool over the same stateless JSON-RPC HTTP
+ *  endpoint (`POST /mcp`, docs/mcp-usage.md in the main repo) any MCP client
+ *  uses — gated by the same Bearer-key `auth` as the REST API, so one call
+ *  here costs exactly one rate-limit unit, same as one REST GET. Unwraps the
+ *  JSON-RPC envelope and the tool's own ok/error envelope (contract.ts) down
+ *  to `data`, throwing the same `Modelglass API error on ...` shape apiGet's
+ *  REST callers already throw, so nothing downstream needs to change error
+ *  handling to match a new shape. */
+async function mcpCall<T>(toolName: string, args: Record<string, unknown>, apiKey: string): Promise<T> {
+  const res = await fetch(`${MODELGLASS_API}/mcp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: ++mcpRequestId,
+      method: "tools/call",
+      params: { name: toolName, arguments: args },
+    }),
+  });
+  const body = (await res.json().catch(() => null)) as McpJsonRpcResponse | null;
+  if (!res.ok || !body) {
+    throw new Error(`Modelglass API ${res.status} on mcp:${toolName}`);
+  }
+  if (body.error) {
+    throw new Error(`Modelglass API error on mcp:${toolName}: ${body.error.code} — ${body.error.message}`);
+  }
+  const payload = body.result?.structuredContent as McpToolEnvelope<T> | undefined;
+  if (!payload || !payload.ok) {
+    throw new Error(
+      `Modelglass API error on mcp:${toolName}: ${payload?.error?.code ?? "UNKNOWN"} — ` +
+        `${payload?.error?.message ?? "no structuredContent in MCP response"}`,
+    );
+  }
+  return payload.data as T;
+}
+
 export async function fetchCompetitors(apiKey: string, modelId: string): Promise<CompetitorEntry[]> {
-  const json = await apiGet<CompetitorsResponse>(
-    `/v1/models/${encodeURIComponent(modelId)}/competitors`,
+  const result = await mcpCall<CompetitorsResult>(
+    "modelglass_get_competitors",
+    { model_id: modelId },
     apiKey,
   );
-  return json.data.competitors;
+  return result.competitors;
 }
 
 // ---------------------------------------------------------------------------
@@ -158,17 +223,19 @@ export async function fetchCompetitors(apiKey: string, modelId: string): Promise
 // ---------------------------------------------------------------------------
 
 /**
- * Look up the caller's own plan tier via GET /v1/keys — a real signal from
- * the account's key record, not an assumption based on key-string format
- * (mg_free_/mg_starter_/mg_pro_ prefixes are a human-readable convention,
- * not a contract; the tier the account was actually provisioned at is what
- * governs the pricing-history gate — ADR 0004 — so that's what's checked).
+ * Look up the caller's own plan tier via the modelglass_get_account MCP tool
+ * — a real signal from the account's own key record, not an assumption based
+ * on key-string format (mg_free_/mg_starter_/mg_pro_ prefixes are a
+ * human-readable convention, not a contract; the tier the account was
+ * actually provisioned at is what governs the pricing-history gate —
+ * ADR 0004 — so that's what's checked). Unlike the old GET /v1/keys call
+ * this replaces, modelglass_get_account is scoped to exactly the calling
+ * credential, so there's no list to search for the "active" record among —
+ * the tool returns that record directly.
  */
-export async function fetchTier(apiKey: string): Promise<KeyRecord["tier"]> {
-  const json = await apiGet<KeysResponse>("/v1/keys", apiKey);
-  const mine = json.data.find((k) => k.status === "active") ?? json.data[0];
-  if (!mine) throw new Error("GET /v1/keys returned no key records for this account");
-  return mine.tier;
+export async function fetchTier(apiKey: string): Promise<AccountInfo["tier"]> {
+  const account = await mcpCall<AccountInfo>("modelglass_get_account", {}, apiKey);
+  return account.tier;
 }
 
 /**
@@ -457,13 +524,13 @@ export function computeDrift(
 }
 
 /** Grounded switch suggestions: for each stack model, look at its
- *  competitors (GET /v1/models/:modelId/competitors), keep only ones
+ *  competitors (the modelglass_get_competitors MCP tool), keep only ones
  *  strictly cheaper on the same price unit, then fetch each candidate's own
  *  capability_profile and keep only the ones that match or exceed the stack
  *  model's rating on every dimension the stack model rates "strong" on.
- *  Requires a second lookup per candidate — the competitors endpoint
- *  returns price but not capability data (see packages/api/src/handlers/
- *  competitors.ts in the main repo). */
+ *  Requires a second lookup per candidate — the competitors tool returns
+ *  price but not capability data (see packages/api/src/mcp/tools.ts's
+ *  getCompetitors in the main repo). */
 export async function computeSwitchSuggestions(
   apiKey: string,
   stackModelIds: string[],

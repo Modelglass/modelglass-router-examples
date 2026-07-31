@@ -6,7 +6,7 @@
  *   MODELGLASS_API_KEY=<key> node --import tsx/esm src/check.ts --from <model_id>
  *
  * With --from alone, candidate to-models come from the feed's own
- * GET /v1/models/:modelId/competitors list and each resolvable candidate gets
+ * modelglass_get_competitors MCP tool and each resolvable candidate gets
  * the full diff.
  *
  * Works on every plan tier. The price-stability section is computed from
@@ -22,7 +22,7 @@
 
 import {
   type ModelEntry,
-  type KeyRecord,
+  type PlanTier,
   type CapabilityChange,
   fetchAllModels,
   fetchCompetitors,
@@ -112,7 +112,7 @@ function twelveMonthsAgo(today: Date): string {
  *  Starter and Pro would add. It never claims hidden entries exist — a
  *  gated key cannot know that — only what a wider window would show if the
  *  history holds any. */
-function windowFraming(tier: KeyRecord["tier"], fromModel: ModelEntry, toModel: ModelEntry): string[] {
+function windowFraming(tier: PlanTier, fromModel: ModelEntry, toModel: ModelEntry): string[] {
   const today = new Date();
   const names = `${fromModel.name} and ${toModel.name}`;
   if (tier === "free" || tier === "app") {
@@ -141,7 +141,7 @@ function windowFraming(tier: KeyRecord["tier"], fromModel: ModelEntry, toModel: 
 function printDiff(
   fromModel: ModelEntry,
   toModel: ModelEntry,
-  tier: KeyRecord["tier"],
+  tier: PlanTier,
 ): void {
   const today = new Date();
   console.log("\n" + hr());
@@ -268,7 +268,7 @@ async function main(): Promise<void> {
 
   console.log(`Fetching feed from ${MODELGLASS_API} ...`);
   const [tier, models] = await Promise.all([fetchTier(apiKey), fetchAllModels(apiKey)]);
-  console.log(`Plan tier (via GET /v1/keys): ${tier}`);
+  console.log(`Plan tier (via modelglass_get_account): ${tier}`);
 
   const fromModel = resolveModel(models, args.from, "--from");
 
@@ -279,7 +279,7 @@ async function main(): Promise<void> {
   }
 
   // --from alone: candidates come from the feed's own competitor list.
-  console.log(`No --to given — pulling candidates from GET /v1/models/:modelId/competitors ...`);
+  console.log(`No --to given — pulling candidates from the modelglass_get_competitors MCP tool ...`);
   const competitors = await fetchCompetitors(apiKey, fromModel.model_id);
   if (!competitors.length) {
     console.log(
