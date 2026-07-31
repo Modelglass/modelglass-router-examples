@@ -49,7 +49,7 @@ npm run check -- --from bfl/flux-1-1-pro --to bfl/flux-1-dev
 ```
 
 **Or give only `--from`** — candidates then come from the feed's own
-`GET /v1/models/:modelId/competitors` list (the registry's curated
+`modelglass_get_competitors` MCP tool (the registry's curated
 `closest_competitors`), and each candidate that resolves to a distinct model
 in the feed gets the full diff. Candidates that don't resolve (or that are the
 same model on a different host — a hosting decision, not a migration) are
@@ -80,8 +80,8 @@ Non-zero only on real errors (unknown model id, missing key, API failure).
 
 ## How it works
 
-1. Looks up the calling key's actual plan tier via `GET /v1/keys` — the same
-   real account-record signal stack-watch checks. Unlike stack-watch this is
+1. Looks up the calling key's actual plan tier via the `modelglass_get_account`
+   MCP tool — the same real account-record signal stack-watch checks. Unlike stack-watch this is
    **not a gate**: every tier runs. The tier decides how the price-stability
    section is framed — which history window the numbers were computed under,
    and (on Free) what a wider window would add to this specific run.

@@ -6,6 +6,10 @@
  * (`node --test`) — zero added dependencies, consistent with this repo's
  * existing "Node.js 20+, nothing else required" posture.
  *
+ * requireStarterOrPro's fetch mocks below use the MCP JSON-RPC envelope
+ * (SCO-338 follow-on — fetchTier now calls modelglass_get_account over
+ * POST /mcp instead of GET /v1/keys), not the old flat REST shape.
+ *
  * Run: npm test
  */
 import { test, describe, mock } from "node:test";
@@ -22,7 +26,7 @@ import {
 
 // ---------------------------------------------------------------------------
 // Fixtures — shapes mirror real responses observed against the live feed
-// (GET /v1/models, GET /v1/keys) during development.
+// (GET /v1/models) during development.
 // ---------------------------------------------------------------------------
 
 function makeModel(overrides: Partial<ModelEntry> = {}): ModelEntry {
@@ -257,14 +261,35 @@ describe("computeDrift", () => {
 // requireStarterOrPro — the free-key rejection path
 // ---------------------------------------------------------------------------
 
+/** Builds the same JSON-RPC + tool-envelope response shape POST /mcp returns
+ *  for a `tools/call` on modelglass_get_account (handler.ts in the main
+ *  repo), so these mocks exercise fetchTier's real parsing path rather than
+ *  a shape it no longer receives. */
+function mockAccountResponse(tier: string): Response {
+  const payload = {
+    schema_version: 1,
+    artifact_version: 1,
+    built_at: "2026-07-30T00:00:00Z",
+    ok: true,
+    data: { keyId: "k1", tier, status: "active", createdAt: "2026-01-01T00:00:00Z" },
+  };
+  return new Response(
+    JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      result: {
+        content: [{ type: "text", text: JSON.stringify(payload) }],
+        structuredContent: payload,
+        isError: false,
+      },
+    }),
+    { status: 200 },
+  );
+}
+
 describe("requireStarterOrPro", () => {
   test("exits with a clear message when the key's tier is free", async () => {
-    const fetchMock = mock.method(globalThis, "fetch", async () =>
-      new Response(
-        JSON.stringify({ ok: true, data: [{ keyId: "k1", tier: "free", status: "active" }] }),
-        { status: 200 },
-      ),
-    );
+    const fetchMock = mock.method(globalThis, "fetch", async () => mockAccountResponse("free"));
     const exitMock = mock.method(process, "exit", ((): never => {
       throw new Error("__EXIT__");
     }) as never);
@@ -285,12 +310,7 @@ describe("requireStarterOrPro", () => {
   });
 
   test("does not exit when the key's tier is starter", async () => {
-    const fetchMock = mock.method(globalThis, "fetch", async () =>
-      new Response(
-        JSON.stringify({ ok: true, data: [{ keyId: "k1", tier: "starter", status: "active" }] }),
-        { status: 200 },
-      ),
-    );
+    const fetchMock = mock.method(globalThis, "fetch", async () => mockAccountResponse("starter"));
     const exitMock = mock.method(process, "exit", (() => {}) as never);
 
     try {
@@ -303,12 +323,7 @@ describe("requireStarterOrPro", () => {
   });
 
   test("does not exit when the key's tier is pro", async () => {
-    const fetchMock = mock.method(globalThis, "fetch", async () =>
-      new Response(
-        JSON.stringify({ ok: true, data: [{ keyId: "k1", tier: "pro", status: "active" }] }),
-        { status: 200 },
-      ),
-    );
+    const fetchMock = mock.method(globalThis, "fetch", async () => mockAccountResponse("pro"));
     const exitMock = mock.method(process, "exit", (() => {}) as never);
 
     try {
