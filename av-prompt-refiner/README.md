@@ -28,11 +28,13 @@ change, not generic advice.
 
 ## Background
 
-Second example in this repo, alongside `cost-aware-vscode-router`. Where that
-one calls the plain REST feed (`GET /v1/models`) for LLM routing decisions,
-this one calls the **Modelglass HTTP MCP endpoint** directly over JSON-RPC —
-the tool surface an agent or IDE integration would actually use — via the
-`modelglass_get_model` tool. See
+Second example in this repo, alongside `cost-aware-vscode-router`. Both call
+the **Modelglass HTTP MCP endpoint** directly over JSON-RPC — the tool surface
+an agent or IDE integration would actually use — but different tools for
+different shapes of data: this one via `modelglass_get_model` (a single
+model's full profile, to ground the prompt-refinement guidance), where
+`cost-aware-vscode-router` uses `modelglass_list_models` (the bulk pool, for
+ranking/selection). See
 [`docs/mcp-usage.md`](https://github.com/Modelglass/modelglass/blob/main/docs/mcp-usage.md)
 in the main repo for the full MCP contract.
 
