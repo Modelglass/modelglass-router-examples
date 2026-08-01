@@ -1,14 +1,15 @@
 /**
  * Modelglass feed fetching, tier gating, and drift computation for stack-watch.
  *
- * SCO-338 follow-on: tier introspection and competitor lookups now go over
- * the MCP endpoint (`POST /mcp`, tools `modelglass_get_account` and
- * `modelglass_get_competitors`) instead of REST — those two tools shipped in
- * PR #307 specifically to close the gap this file used to document (neither
- * capability was exposed by any of the original four MCP tools). The bulk
- * model list still uses the plain REST feed (`GET /v1/models`) — no MCP tool
- * returns the full cross-modality listing this tool needs for drift
- * comparison, so that part stays on REST.
+ * SCO-338/SCO-351 follow-on: every Modelglass call in this file now goes over
+ * the MCP endpoint (`POST /mcp`) instead of REST — tier introspection and
+ * competitor lookups (`modelglass_get_account`, `modelglass_get_competitors`)
+ * shipped in PR #307 to close the gap this file used to document, and the
+ * bulk model list (`modelglass_list_models` with `generation: "all"`) was
+ * verified live to return the identical full cross-modality listing as the
+ * REST `GET /v1/models?generation=all` call it replaces (155/155 models,
+ * same id set) — an earlier version of this comment claimed no MCP tool
+ * covered that case, which wasn't true even at the time it was written.
  */
 
 // ---------------------------------------------------------------------------
@@ -81,12 +82,6 @@ export interface ModelEntry {
   offerings: Offering[];
 }
 
-interface ApiListResponse {
-  ok: boolean;
-  data: ModelEntry[];
-  error?: { code: string; message: string };
-}
-
 /** Shape of `modelglass_get_account`'s `data` — the calling credential's own
  *  account record (tier includes "app" for the iOS app key type; SCO-174).
  *  Scoped to exactly the calling key, unlike the old GET /v1/keys response
@@ -118,42 +113,14 @@ interface CompetitorsResult {
 }
 
 // ---------------------------------------------------------------------------
-// Modelglass REST API — still used for the bulk model list only (see the
-// file-level comment above for why this one call stays on REST)
+// Modelglass MCP endpoint — every call in this file (SCO-338/SCO-351)
 // ---------------------------------------------------------------------------
 
 // Override for pointing at a local/self-hosted API instance (e.g. `pnpm dev:api`
 // in the main modelglass repo) — used to verify this tool against a Starter/Pro
 // dev key without touching production billing. Unset in normal use; defaults to
-// the live production API. Also the base for the /mcp endpoint below — same
-// host, same auth, just a different path.
+// the live production API.
 export const MODELGLASS_API = process.env["MODELGLASS_API_URL"] || "https://modelglass-api.vercel.app";
-
-async function apiGet<T>(path: string, apiKey: string): Promise<T> {
-  const res = await fetch(`${MODELGLASS_API}${path}`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
-  const json = (await res.json().catch(() => null)) as (T & { ok: boolean; error?: { code: string; message: string } }) | null;
-  if (!res.ok || !json) {
-    throw new Error(`Modelglass API ${res.status} on ${path}`);
-  }
-  if (!json.ok) {
-    throw new Error(`Modelglass API error on ${path}: ${json.error?.code} — ${json.error?.message}`);
-  }
-  return json;
-}
-
-/** Every model across every modality — the bulk /v1/models response has the
- *  same per-model shape as GET /v1/models/:modelId, so one fetch covers the
- *  whole stack regardless of how many modalities it spans. */
-export async function fetchAllModels(apiKey: string): Promise<ModelEntry[]> {
-  const json = await apiGet<ApiListResponse>("/v1/models?generation=all", apiKey);
-  return json.data;
-}
-
-// ---------------------------------------------------------------------------
-// Modelglass MCP endpoint — account + competitor lookups (SCO-338)
-// ---------------------------------------------------------------------------
 
 interface McpToolEnvelope<T> {
   schema_version: number;
@@ -216,6 +183,13 @@ export async function fetchCompetitors(apiKey: string, modelId: string): Promise
     apiKey,
   );
   return result.competitors;
+}
+
+/** Every model across every modality, via `modelglass_list_models` with
+ *  `generation: "all"` — verified live to return the identical id set as the
+ *  REST `GET /v1/models?generation=all` call this replaces (SCO-351). */
+export async function fetchAllModels(apiKey: string): Promise<ModelEntry[]> {
+  return mcpCall<ModelEntry[]>("modelglass_list_models", { generation: "all" }, apiKey);
 }
 
 // ---------------------------------------------------------------------------

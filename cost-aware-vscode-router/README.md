@@ -93,8 +93,8 @@ curated score at all is still excluded either way (see "How it works").
 
 ## How it works
 
-The router calls `GET /v1/models?modality=llm` on the live Modelglass feed, then
-applies two selection rules:
+The router calls the `modelglass_list_models` MCP tool (`modality: "llm"`) on
+the live Modelglass feed, then applies two selection rules:
 
 **Coding subtasks** — filter `capability_profile.coding == "strong"`, rank by
 the SWE-bench Verified score read from the feed's structured
