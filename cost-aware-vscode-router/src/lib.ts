@@ -134,11 +134,6 @@ export interface ModelEntry {
   offerings: Offering[];
 }
 
-export interface ApiResponse {
-  ok: boolean;
-  data: ModelEntry[];
-}
-
 export interface NormalisedModel {
   name: string;
   slug: string;
@@ -211,23 +206,78 @@ export function deviationType(
 }
 
 // ---------------------------------------------------------------------------
-// Modelglass API
+// Modelglass MCP client (SCO-337) — this example's one REST call
+// (GET /v1/models?modality=llm) had no documented blocking reason to stay
+// REST, unlike stack-watch/switch-check before their own SCO-351 swap; the
+// existing modelglass_list_models tool already returns exactly this
+// (modality + generation filters included), same integration style as
+// image-batch-coster's lib.ts.
 // ---------------------------------------------------------------------------
 
 export const MODELGLASS_API =
   process.env.MODELGLASS_API ?? "https://modelglass-api.vercel.app";
 
-export async function fetchLLMModels(apiKey: string): Promise<NormalisedModel[]> {
-  const res = await fetch(`${MODELGLASS_API}/v1/models?modality=llm`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
+interface McpToolCallResult {
+  content: Array<{ type: string; text: string }>;
+  isError: boolean;
+}
+
+interface McpJsonRpcResponse {
+  jsonrpc: "2.0";
+  id: number;
+  result?: McpToolCallResult;
+  error?: { code: number; message: string };
+}
+
+let requestId = 0;
+
+async function callMcpTool(
+  apiKey: string,
+  name: string,
+  args: Record<string, unknown>,
+): Promise<unknown> {
+  const res = await fetch(`${MODELGLASS_API}/mcp`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      method: "tools/call",
+      params: { name, arguments: args },
+      id: ++requestId,
+    }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Modelglass API ${res.status}: ${body}`);
+    throw new Error(`Modelglass MCP ${res.status}: ${body}`);
   }
-  const json = (await res.json()) as ApiResponse;
-  if (!json.ok) throw new Error("Modelglass API returned ok=false");
-  return json.data.map(normalise);
+  const json = (await res.json()) as McpJsonRpcResponse;
+  if (json.error) {
+    throw new Error(`Modelglass MCP error ${json.error.code}: ${json.error.message}`);
+  }
+  const result = json.result;
+  const text = result?.content?.[0]?.text;
+  if (!result || result.isError || !text) {
+    throw new Error(`Modelglass MCP tool call failed: ${text ?? "no content returned"}`);
+  }
+  const parsed = JSON.parse(text) as {
+    ok: boolean;
+    data?: unknown;
+    error?: { code: string; message: string };
+  };
+  if (!parsed.ok) {
+    throw new Error(`Modelglass API error: ${parsed.error?.code} — ${parsed.error?.message}`);
+  }
+  return parsed.data;
+}
+
+export async function fetchLLMModels(apiKey: string): Promise<NormalisedModel[]> {
+  const data = (await callMcpTool(apiKey, "modelglass_list_models", {
+    modality: "llm",
+  })) as ModelEntry[];
+  return data.map(normalise);
 }
 
 // ---------------------------------------------------------------------------
