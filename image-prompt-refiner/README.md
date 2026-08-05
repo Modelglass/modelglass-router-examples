@@ -128,27 +128,62 @@ pricing-only entry errors out — there's nothing to ground the rewrite in).
 
 ---
 
-## Worked examples
+## Worked examples (live runs, 2026-08-05)
 
-Pending a live run — the MCP/registry-fetching half of this tool (capability
-profile retrieval, field-allowlist filtering) has been verified end-to-end
-against the live Modelglass feed for `bfl/flux-1-1-pro`, `bfl/flux-kontext`,
-and `bytedance/seedream-4-0`, including both error paths (a pricing-only
-model, an unknown model id). The Claude-rewrite half needs a real run with
-an Anthropic key to capture here, matching `av-prompt-refiner`'s convention
-of real dated transcripts rather than hand-written ones. Two ready-to-run
-commands to produce them:
+### Generate mode — `openai/dall-e-3`
 
-```bash
-npm run refine-image -- --mode generate --model openai/dall-e-3 --prompt "An ultra-photorealistic macro close-up photo of a dewdrop on a spider web at dawn, square 512x512, tiny readable text caption in the corner reading 'Morning Dew'"
+Rough prompt asks for square 512×512 and "ultra-photorealistic"; DALL·E 3's
+data rates `photorealism: moderate` ("tends to stylise / over-beautify") and
+only supports three fixed output resolutions (1024×1024, 1024×1792,
+1792×1024) — no 512×512.
 
-npm run refine-image -- --mode edit --model bytedance/seedream-4-0 --prompt "Combine these three product photos into one clean lifestyle photo showing all three items together, keeping each item's appearance exactly as shown in its source photo"
+**Input:** `--mode generate --model openai/dall-e-3 --prompt "An ultra-photorealistic macro close-up photo of a dewdrop on a spider web at dawn, square 512x512, tiny readable text caption in the corner reading 'Morning Dew'"`
+
+**Output:**
+
+```
+## Refined Prompt
+
+A macro close-up of a single glistening dewdrop clinging to a strand of a spider's web at dawn. The dewdrop acts as a tiny lens, faintly refracting the soft golden-pink morning light and the blurred silhouette of the web behind it. Fine silk threads radiate outward, beaded with smaller droplets, catching cool backlight against a dreamy, softly blurred background of muted dawn colors. Shallow depth of field with delicate, painterly bokeh; gentle, luminous, slightly idealized lighting. In the lower-right corner, a small clean caption in a simple sans-serif font reads "Morning Dew" in soft white lettering. Square 1024×1024 composition.
+
+## What Changed and Why
+
+- **Resolution changed from 512×512 to 1024×1024 (square).** — Driven by `resolution-ceiling` notes: "Fixed outputs: 1024×1024, 1024×1792, 1792×1024"; 512×512 is not an available output, so the nearest square option was used.
+- **Softened "ultra-photorealistic" to a stylised, luminous, slightly idealized macro look.** — Driven by `photorealism` rating "moderate" with notes "tends to stylise / over-beautify" and the limitation "weaker raw photorealism"; the prompt leans into the model's strength rather than promising true photorealism it delivers weakly. Tradeoff: expect a beautified/artistic macro rather than a clinically realistic photograph.
+- **Kept the corner text caption and specified it plainly ("Morning Dew," simple sans-serif, white).** — Driven by `text-rendering` rating "strong" ("Notably better at legible in-image text"); the caption is a good fit, though I dropped the word "tiny" and asked for a clean simple font since very small type still renders more reliably when kept legible-sized.
+- **Expanded into one rich, descriptive scene paragraph.** — Driven by `prompt-adherence` rating "strong" and `use_cases` ("Complex prompts that must be followed faithfully"); the model responds well to detailed, caption-style descriptions.
 ```
 
-(`dall-e-3`'s data rates `photorealism: moderate` with "tends to stylise /
-over-beautify" and a fixed 1024×1024/1024×1792/1792×1024 resolution set —
-good for showing a tradeoff-flagged rewrite; `seedream-4-0`'s data notes
-"up to a dozen reference images," a good fit for the multi-photo edit case.)
+### Edit mode — `bytedance/seedream-4-0`
+
+Rough prompt asks to combine three product photos into one lifestyle shot;
+Seedream 4.0's data specifically calls out support for up to a dozen
+reference images for multi-image composition/fusion.
+
+**Input:** `--mode edit --model bytedance/seedream-4-0 --prompt "Combine these three product photos into one clean lifestyle photo showing all three items together, keeping each item's appearance exactly as shown in its source photo"`
+
+**Output:**
+
+```
+## Refined Edit Instruction
+
+Using the three provided product photos as reference images, compose a single clean lifestyle scene that arranges all three items together in a natural, cohesive setting.
+
+- Fuse the three source photos into one unified image, placing all three products together as if photographed in the same lifestyle setting.
+- Preserve each item's appearance exactly as shown in its own source photo — identical shape, color, materials, proportions, branding, and any on-product text or logos. Do not restyle, recolor, or redesign any product.
+- Generate a clean, uncluttered lifestyle background and consistent lighting that ties the three items together, without introducing extra props that compete with the products.
+- Render at high resolution (up to 4K) for a crisp, presentation-ready result.
+- If any product carries printed labels or text, keep that text sharp and correctly rendered.
+
+## What Changed and Why
+
+- **Framed as a multi-reference composition rather than a single-image edit** — driven by `compositional-accuracy` ("Supports up to a dozen reference images for organic multi-image composition/fusion") and the `use_cases` entry "Multi-image composition/fusion from up to a dozen reference images"; three source photos fall well within the dozen-image ceiling.
+- **Explicitly instructed to preserve each item's exact appearance per its source** — the rough prompt required identity preservation, and the multi-image fusion capability is the specific feature that carries per-item fidelity across the composite.
+- **Added guidance to keep any on-product text/labels sharp** — leverages `text-rendering` (rated "strong," with correct in-image text rendering called out).
+- **Specified "up to 4K" high-resolution output** — grounded in `resolution-ceiling` ("4K generation," rated strong).
+- **Kept requirements modest on photographic realism and did not over-promise a polished photoreal render** — `photorealism` and `artistic-range` are rated "unknown" (see `limitations`: unrated), so a clean lifestyle look was requested without asserting guaranteed photographic realism.
+- **No negative-prompt or aspect-ratio directives added** — the capability data contains no prose in architecture/routing/limitations describing negative-prompt syntax or aspect-ratio limits, so none were invented.
+```
 
 ---
 
