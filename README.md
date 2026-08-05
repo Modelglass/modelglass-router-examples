@@ -12,12 +12,13 @@ Worked examples of building on top of the live [Modelglass](https://modelglass.c
 | `image-batch-coster` | Image | Cross-host cost ranking for an image-generation batch job — normalizes `per_image`/`per_megapixel` pricing to a cost-per-job, calls out same-model different-host price spreads, and honestly refuses to force-convert `per_credit`/`per_month` offerings into a fake estimate. Free-tier friendly, no LLM call. | [README](image-batch-coster/README.md) |
 | `switch-check` | LLM, image, video, audio (cross-modality) | Grounded migration diff for a model switch you're considering (`--from X --to Y`, or `--from` alone to diff against the feed's own competitor list) — unit-matched price delta, price *stability* from the append-only history ("cheaper today — but is that a month-old cut or a year-old rate?"), per-dimension capability gains/losses, billing-unit cost-curve warnings, and lifecycle checks in both directions. Evidence, not a verdict. Works on every tier including Free; paid tiers deepen the stability section and the output says exactly how. | [README](switch-check/README.md) |
 | `shot-plan-compiler` | Video | Storyboard-in, execution-plan-out: per-shot model pick from the live video registry with field-cited rationale, a chain-feasibility check on every shot-to-shot handoff (fps mismatches, resolution steps, silent-to-native-audio seams, shots exceeding `max_clip_duration` needing a split), and a total job cost with the same honest-unit discipline as image-batch-coster. Planner only — no generation calls, no compositing. | [README](shot-plan-compiler/README.md) |
+| `image-prompt-refiner` | Image | Given a rough prompt and an already-chosen image model, pulls MCP capability-profile data and rewrites the prompt to fit — `--mode generate` for pure text-to-image, `--mode edit` for image-editing models (existing image + instruction), mirroring the real generation/editing split the image ontology itself draws. Sibling to `av-prompt-refiner` for the image vertical. | [README](image-prompt-refiner/README.md) |
 
 ## Requirements
 
 - Node.js 20+
 - A Modelglass API key ([get a free one](https://modelglass.com.au/signup)) — required by every example
-- `av-prompt-refiner` additionally requires an Anthropic API key (`ANTHROPIC_API_KEY`) — see its own README
+- `av-prompt-refiner` and `image-prompt-refiner` additionally require an Anthropic API key (`ANTHROPIC_API_KEY`) — see each one's own README
 - `stack-watch` additionally requires that key to be **Starter or Pro**, not Free — see its own README for why
 
 ## Setup
