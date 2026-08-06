@@ -12,6 +12,11 @@ generation calls, no provider keys beyond the Modelglass API key, no real
 spend, fully reproducible output — see
 ["What's not here"](#whats-not-here-intentional) below.
 
+Pairs with [shot-prompt-refiner](../shot-prompt-refiner/README.md) (SCO-357):
+plan the shots here, then refine each shot's rough prompt to fit its picked
+model there. Separate tool, separate codebase, separate opt-in step — this
+tool's no-generation-call, no-LLM-call scope is unchanged by that pairing.
+
 ---
 
 ## Background
@@ -67,6 +72,19 @@ node --import tsx/esm shot-plan-compiler/src/plan.ts my-storyboard.json
 ```bash
 npm run plan -- --demo --alternates
 ```
+
+**Emit machine-readable JSON instead of the text report** (SCO-357 — feeds
+[shot-prompt-refiner](../shot-prompt-refiner/README.md): plan the shots
+here, refine each shot's prompt there):
+
+```bash
+npm run plan -- --demo --json > plan.json
+npm run refine-shots -- plan.json
+```
+
+Not valid together with `--alternates` — a downstream consumer needs one
+concrete plan, not three budget-level variants, to know which model each
+shot was actually assigned to.
 
 **Storyboard file format:**
 
