@@ -6,9 +6,19 @@
  *   MODELGLASS_API_KEY=<free-or-paid-key> node --import tsx/esm src/plan.ts [storyboard.json]
  *   MODELGLASS_API_KEY=<free-or-paid-key> node --import tsx/esm src/plan.ts --demo
  *   MODELGLASS_API_KEY=<free-or-paid-key> node --import tsx/esm src/plan.ts --demo --alternates
+ *   MODELGLASS_API_KEY=<free-or-paid-key> node --import tsx/esm src/plan.ts --demo --json > plan.json
  *
  * Planner only — see Linear SCO-190. This never calls a generation provider,
  * never spends money, and needs no key beyond the Modelglass API key.
+ *
+ * --json (SCO-357): emits { storyboard, plan } as machine-readable JSON on
+ * stdout instead of the text report, so this tool's output can be piped
+ * into shot-prompt-refiner (plan the shots here, refine each shot's prompt
+ * there) without shot-prompt-refiner re-deriving the same model picks.
+ * Informational/progress messages move to stderr in this mode so stdout
+ * stays pure JSON. Not valid together with --alternates — a consumer needs
+ * one concrete plan, not three budget-level variants, to know which model
+ * each shot was actually assigned to.
  */
 
 import { readFileSync } from "node:fs";
@@ -130,14 +140,25 @@ async function main(): Promise<void> {
   const apiKey = requireApiKey();
   const args = process.argv.slice(2);
   const wantsAlternates = args.includes("--alternates");
+  const wantsJson = args.includes("--json");
   const positional = args.filter((a) => !a.startsWith("--"));
+  const log = wantsJson ? console.error : console.log;
+
+  if (wantsJson && wantsAlternates) {
+    console.error(
+      "--json and --alternates can't be combined — a downstream consumer (e.g. shot-prompt-refiner) " +
+        "needs one concrete plan, not three budget-level variants, to know which model each shot was " +
+        "actually assigned to. Run --json without --alternates for the default (budget) plan.",
+    );
+    process.exit(1);
+  }
 
   let storyboard: Storyboard;
   if (args.includes("--demo") || positional.length === 0) {
     storyboard = DEMO_STORYBOARD;
     if (positional.length === 0 && !args.includes("--demo")) {
-      console.log("No storyboard supplied — running the built-in demo storyboard.");
-      console.log(
+      log("No storyboard supplied — running the built-in demo storyboard.");
+      log(
         "Pass --demo explicitly, or provide a storyboard.json path as the first argument. " +
           "Add --alternates for budget/balanced/premium plans.\n",
       );
@@ -157,9 +178,9 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  console.log(`Fetching the video-modality offering pool from ${MODELGLASS_MCP_URL} ...`);
+  log(`Fetching the video-modality offering pool from ${MODELGLASS_MCP_URL} ...`);
   const models = await fetchVideoModels(apiKey);
-  console.log(`  ${models.length} video models loaded.`);
+  log(`  ${models.length} video models loaded.`);
 
   if (wantsAlternates) {
     const plans = computeAlternatePlans(models, storyboard);
@@ -175,7 +196,11 @@ async function main(): Promise<void> {
     process.exit(anyInfeasible ? 1 : 0);
   } else {
     const plan = computePlan(models, storyboard);
-    printPlan(plan);
+    if (wantsJson) {
+      console.log(JSON.stringify({ storyboard, plan }, null, 2));
+    } else {
+      printPlan(plan);
+    }
     process.exit(plan.shots_without_cost.length > 0 ? 1 : 0);
   }
 }
