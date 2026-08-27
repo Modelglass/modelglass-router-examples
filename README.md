@@ -1,6 +1,38 @@
+<p align="center"><strong>Eight worked examples of building on the live Modelglass pricing + capability feed — cost-aware routing, prompt refinement grounded in per-model capability data, price-drift watching, migration diffing, and cross-host cost ranking for image/video/audio jobs.</strong></p>
+
+<p align="center">
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License: MIT"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node.js-%3E%3D20-green.svg?style=flat-square" alt="Node.js >= 20"></a>
+  <a href="https://modelglass.com.au/api-docs"><img src="https://img.shields.io/badge/Documentation-modelglass.com.au%2Fapi--docs-blue.svg?style=flat-square" alt="Documentation"></a>
+  <a href="#setup"><img src="https://img.shields.io/badge/Quickstart-jump%20to%20setup-blue.svg?style=flat-square" alt="Quickstart"></a>
+  <a href="https://modelglass.com.au/signup"><img src="https://img.shields.io/badge/API%20key-free%2C%20no%20card-blue.svg?style=flat-square" alt="Free API key"></a>
+</p>
+
 # modelglass-router-examples
 
-Worked examples of building on top of the live [Modelglass](https://modelglass.com.au) pricing and capability feed — each one demonstrates a different way of using Modelglass data as grounding context for an LLM-powered tool. These are code examples meant to be read and adapted, not hosted/live demos.
+## What Modelglass is
+
+[Modelglass](https://modelglass.com.au) is a pricing-and-capability data
+layer for AI models — image, video, audio, and LLM — built as a sourced,
+append-only registry: every price carries a source URL and the date it was
+verified, and a repricing is a new dated entry, never a silent overwrite.
+It's served two ways: a free comparison site, and a paid **read API + MCP
+server** (`https://modelglass-api.vercel.app`, `POST /mcp`) for operators
+wiring model pricing into their own routing or tooling. Modelglass isn't a
+router or a gateway itself — it doesn't proxy your traffic or pick a model
+at runtime. It's the data other people's routing logic (including every
+example in this repo) reads.
+
+## What this repo demonstrates
+
+Each top-level directory is a small, self-contained, **read-and-adapt** code
+example of using that feed as grounding context for an LLM-powered tool —
+not a hosted demo, not something you install as a package. Every example
+answers a real question you'd otherwise answer by hand: which model is
+cheapest for this task and still clears a quality bar, does this prompt
+actually fit the model I picked, has this model's price moved since I last
+checked, what would switching models actually cost and gain me, what would
+this batch job cost across every host that sells the model.
 
 ## Examples
 
@@ -18,7 +50,7 @@ Worked examples of building on top of the live [Modelglass](https://modelglass.c
 ## Requirements
 
 - Node.js 20+
-- A Modelglass API key ([get a free one](https://modelglass.com.au/signup)) — required by every example
+- A Modelglass API key ([get a free one](https://modelglass.com.au/signup), no card) — required by every example
 - `av-prompt-refiner`, `image-prompt-refiner`, and `shot-prompt-refiner` additionally require an Anthropic API key (`ANTHROPIC_API_KEY`) — see each one's own README
 - `stack-watch` additionally requires that key to be **Starter or Pro**, not Free — see its own README for why
 
@@ -47,6 +79,20 @@ Both run in CI (`.github/workflows/validate.yml`) on every PR and push to `main`
 - **Hosted/live demos** — these are CLI/code examples meant to be read and adapted, not run as hosted tools.
 - **Model selection logic** — each example assumes the caller has already chosen their target model(s); routing/selection is each example's own concern, not a shared capability.
 - **Actual generation calls, compositing, or rendering** — every example plans, ranks, or reports; none of them calls a generation provider, stitches media, or spends money. `shot-plan-compiler` is explicit about this in its own README since "compiler" could otherwise read as "and then it builds the video."
+
+## Contributing
+
+Bug reports, fixes, and new examples are welcome — see
+[CONTRIBUTING.md](CONTRIBUTING.md) and our
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
+To report a security vulnerability, follow [SECURITY.md](SECURITY.md)
+instead of opening a public issue.
+
+## Talk to us
+
+Questions about Modelglass itself, these examples, or the underlying data —
+email **scott@modelglass.com.au**.
 
 ---
 
