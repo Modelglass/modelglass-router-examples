@@ -37,6 +37,8 @@ export interface PriceEntry {
 export interface Tier {
   id: string;
   label?: string;
+  /** e.g. `{ processing: "batch" }` on a discounted Batch/Flex tier (SCO-646). */
+  attributes?: Record<string, unknown>;
   pricing: PriceEntry[];
 }
 
@@ -93,6 +95,32 @@ export function currentPrice(tier: Tier): PriceEntry | null {
 }
 
 // ---------------------------------------------------------------------------
+// Headline tiers (SCO-640 / SCO-646)
+// ---------------------------------------------------------------------------
+
+/** Tier-id prefixes that mark a discounted / non-standard rate even when the
+ *  tier carries no `attributes.processing` (a guard for future entries). */
+const NON_HEADLINE_TIER_ID = /^(batch|flex|cached|cache)-/;
+
+/**
+ * Whether a tier's price may stand in for a model's headline (list) price.
+ * Discounted processing modes (Batch, Flex, cached input) are real rates but
+ * not the list price, so they must never win a "cheapest per unit" pick —
+ * otherwise a half-price Batch tier silently becomes the headline. Standard
+ * tiers have no `attributes.processing` (or `processing: standard`).
+ * Context-length tiers (e.g. `input-64k` / `input-256k`) stay eligible, so
+ * the lowest short-context base rate still wins by convention.
+ *
+ * Same rule as the Modelglass site/API/MCP (SCO-640), so a model's headline
+ * price here matches what modelglass.com.au shows. Keep the two in sync.
+ */
+export function isHeadlineTier(tier: Tier): boolean {
+  const processing = tier.attributes?.processing;
+  if (processing !== undefined && processing !== null && processing !== "standard") return false;
+  return !NON_HEADLINE_TIER_ID.test(tier.id);
+}
+
+// ---------------------------------------------------------------------------
 // Section 1a — current price, unit-matched
 // ---------------------------------------------------------------------------
 
@@ -123,11 +151,23 @@ export interface PriceComparison {
   toOnly: OfferPrice[];
 }
 
-/** All current prices for a model, one per offering×tier. */
+/** All current prices for a model, one per offering×tier — discounted
+ *  Batch/Flex/cached tiers included (see collectHeadlinePrices). */
 export function collectCurrentPrices(model: ModelEntry): OfferPrice[] {
+  return collectPrices(model, () => true);
+}
+
+/** Current prices from headline tiers only (see isHeadlineTier) — the rates
+ *  that compete in a "cheapest per unit" pick. */
+export function collectHeadlinePrices(model: ModelEntry): OfferPrice[] {
+  return collectPrices(model, isHeadlineTier);
+}
+
+function collectPrices(model: ModelEntry, include: (tier: Tier) => boolean): OfferPrice[] {
   const prices: OfferPrice[] = [];
   for (const off of model.offerings) {
     for (const tier of off.tiers) {
+      if (!include(tier)) continue;
       const p = currentPrice(tier);
       if (!p) continue;
       prices.push({
@@ -146,13 +186,14 @@ export function collectCurrentPrices(model: ModelEntry): OfferPrice[] {
 }
 
 /** Unit-matched price deltas: for every billing unit present on BOTH sides,
- *  compare the cheapest current price on each (apples-to-apples, same rule
- *  the API's own competitor ranking uses — it only computes a ratio when the
- *  units match). Units present on one side only are reported as-is, never
- *  converted. */
+ *  compare the cheapest current headline price on each (apples-to-apples,
+ *  same rule the API's own competitor ranking uses — it only computes a ratio
+ *  when the units match). Only headline tiers compete (SCO-646): a Batch rate
+ *  never stands in for the list price. Units present on one side only are
+ *  reported as-is, never converted. */
 export function comparePrices(fromModel: ModelEntry, toModel: ModelEntry): PriceComparison {
-  const fromPrices = collectCurrentPrices(fromModel);
-  const toPrices = collectCurrentPrices(toModel);
+  const fromPrices = collectHeadlinePrices(fromModel);
+  const toPrices = collectHeadlinePrices(toModel);
 
   const byUnit = (prices: OfferPrice[]) => {
     const m = new Map<string, OfferPrice[]>();
