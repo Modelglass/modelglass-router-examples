@@ -11,6 +11,8 @@ import {
   type Tier,
   currentPrice,
   collectCurrentPrices,
+  collectHeadlinePrices,
+  isHeadlineTier,
   comparePrices,
   analyzeHistory,
   analyzeModelHistory,
@@ -388,5 +390,104 @@ describe("lifecycleCheck", () => {
     const flags = lifecycleCheck(stale, TO_MODEL);
     assert.ok(flags.length > 0);
     assert.ok(flags.every((f) => f.side === "from" && f.severity === "info"));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Headline tiers (SCO-646 — the SCO-640 rule, same as the Modelglass site/MCP)
+// ---------------------------------------------------------------------------
+
+function llmTier(id: string, amount: number, unit: string, attributes?: Record<string, unknown>): Tier {
+  return {
+    id,
+    ...(attributes ? { attributes } : {}),
+    pricing: [{ amount, currency: "USD", unit, effective_from: "2026-01-01" }],
+  };
+}
+
+function llmModel(model_id: string, tiers: Tier[]): ModelEntry {
+  return makeModel({
+    model_id,
+    offerings: [
+      {
+        slug: `${model_id.replace("/", "-")}-test`,
+        provider: "test",
+        model: { id: model_id, modality: "text-generation", status: "ga", generation: "current" },
+        tiers,
+      },
+    ],
+  });
+}
+
+/** Mirrors modelglass-llm's gpt-5-5-pro-openai: Batch is half the list price. */
+const WITH_BATCH = llmModel("openai/gpt-5.5-pro", [
+  llmTier("input", 30, "per_1m_tokens_input"),
+  llmTier("output", 180, "per_1m_tokens_output"),
+  llmTier("batch-input", 15, "per_1m_tokens_input", { processing: "batch" }),
+  llmTier("batch-output", 90, "per_1m_tokens_output", { processing: "batch" }),
+]);
+
+/** Mirrors modelglass-llm's inkling-thinking-machines: context-length tiers
+ *  only, no `input` tier — the short-context base rate is the headline. */
+const CONTEXT_TIERS = llmModel("thinking-machines/inkling", [
+  llmTier("input-64k", 1.87, "per_1m_tokens_input"),
+  llmTier("output-64k", 4.68, "per_1m_tokens_output"),
+  llmTier("input-256k", 3.74, "per_1m_tokens_input"),
+  llmTier("output-256k", 9.36, "per_1m_tokens_output"),
+]);
+
+describe("isHeadlineTier", () => {
+  test("accepts standard and context-length tiers", () => {
+    assert.equal(isHeadlineTier(llmTier("input", 1, "per_1m_tokens_input")), true);
+    assert.equal(isHeadlineTier(llmTier("input-256k", 1, "per_1m_tokens_input")), true);
+    assert.equal(isHeadlineTier(llmTier("input", 1, "per_1m_tokens_input", { processing: "standard" })), true);
+    // Audio STT's standard mode can be named after "batch" transcription —
+    // only the id prefix / processing attribute count, not the word itself.
+    assert.equal(isHeadlineTier(llmTier("prerecorded", 1, "per_minute")), true);
+  });
+
+  test("rejects batch / flex / cached tiers, by attribute or by id prefix", () => {
+    assert.equal(isHeadlineTier(llmTier("batch-input", 1, "per_1m_tokens_input", { processing: "batch" })), false);
+    assert.equal(isHeadlineTier(llmTier("input", 1, "per_1m_tokens_input", { processing: "flex" })), false);
+    assert.equal(isHeadlineTier(llmTier("batch-input", 1, "per_1m_tokens_input")), false);
+    assert.equal(isHeadlineTier(llmTier("cached-input", 1, "per_1m_tokens_input")), false);
+  });
+});
+
+describe("comparePrices headline tiers (SCO-646)", () => {
+  const OTHER = llmModel("a/other", [
+    llmTier("input", 20, "per_1m_tokens_input"),
+    llmTier("output", 60, "per_1m_tokens_output"),
+  ]);
+
+  test("prices a model with a cheaper Batch tier at its Standard rate ($30/$180, not $15/$90)", () => {
+    const { shared } = comparePrices(WITH_BATCH, OTHER);
+    const from = Object.fromEntries(shared.map((s) => [s.unit, s.from.amount]));
+    assert.deepEqual(from, { per_1m_tokens_input: 30, per_1m_tokens_output: 180 });
+    assert.deepEqual(shared.map((s) => s.from.tier_id).sort(), ["input", "output"]);
+  });
+
+  test("the delta is computed against the Standard rate on the to-side too", () => {
+    const { shared } = comparePrices(OTHER, WITH_BATCH);
+    const input = shared.find((s) => s.unit === "per_1m_tokens_input")!;
+    assert.equal(input.to.amount, 30);
+    assert.equal(input.delta_pct, 50); // 20 → 30, not 20 → 15 (-25%)
+  });
+
+  test("batch tiers never surface as unmatched units", () => {
+    const { fromOnly, toOnly } = comparePrices(WITH_BATCH, OTHER);
+    assert.deepEqual([...fromOnly, ...toOnly], []);
+  });
+
+  test("context-length-only models keep the lowest base rate ($1.87)", () => {
+    const { shared } = comparePrices(CONTEXT_TIERS, OTHER);
+    const input = shared.find((s) => s.unit === "per_1m_tokens_input")!;
+    assert.equal(input.from.amount, 1.87);
+    assert.equal(input.from.tier_id, "input-64k");
+  });
+
+  test("collectCurrentPrices still lists discounted tiers; collectHeadlinePrices drops them", () => {
+    assert.equal(collectCurrentPrices(WITH_BATCH).length, 4);
+    assert.deepEqual(collectHeadlinePrices(WITH_BATCH).map((p) => p.tier_id), ["input", "output"]);
   });
 });

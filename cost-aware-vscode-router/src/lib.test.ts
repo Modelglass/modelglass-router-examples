@@ -13,8 +13,11 @@ import {
   type ModelEntry,
   type NormalisedModel,
   type Task,
+  type Tier,
   codingQualityBar,
   deviationType,
+  headlinePrice,
+  isHeadlineTier,
   normalise,
   selectCodingModel,
   selectWritingModel,
@@ -274,5 +277,93 @@ describe("deviationType", () => {
 
   test("actual differs from recommended and --escalated is not set → override", () => {
     assert.equal(deviationType("o4-mini", "Gemini 2.5 Pro", false), "override");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Headline tiers (SCO-646 — the SCO-640 rule, same as modelglass.com.au/MCP)
+// ---------------------------------------------------------------------------
+
+function priced(id: string, amount: number, unit: string, attributes?: Record<string, unknown>): Tier {
+  return {
+    id,
+    ...(attributes ? { attributes } : {}),
+    pricing: [{ amount, currency: "USD", unit, effective_from: "2026-01-01" }],
+  };
+}
+
+function singleOffering(model_id: string, tiers: Tier[]): ModelEntry {
+  return makeModelEntry({
+    model_id,
+    offerings: [{ slug: `${model_id.replace("/", "-")}-host`, provider: "host", quality_tier: "premium", tiers }],
+  });
+}
+
+/** Mirrors modelglass-llm's gpt-5-5-pro-openai: Batch is half the list price. */
+const WITH_BATCH_TIERS = [
+  priced("batch-input", 15, "per_1m_tokens_input", { processing: "batch" }),
+  priced("batch-output", 90, "per_1m_tokens_output", { processing: "batch" }),
+  priced("input", 30, "per_1m_tokens_input"),
+  priced("output", 180, "per_1m_tokens_output"),
+];
+
+/** Mirrors modelglass-llm's inkling-thinking-machines: context-length tiers
+ *  only — there is no tier literally named `input`. */
+const CONTEXT_TIERS = [
+  priced("input-64k", 1.87, "per_1m_tokens_input"),
+  priced("output-64k", 4.68, "per_1m_tokens_output"),
+  priced("input-256k", 3.74, "per_1m_tokens_input"),
+  priced("output-256k", 9.36, "per_1m_tokens_output"),
+];
+
+describe("isHeadlineTier", () => {
+  test("accepts standard and context-length tiers", () => {
+    assert.equal(isHeadlineTier(priced("input", 1, "per_1m_tokens_input")), true);
+    assert.equal(isHeadlineTier(priced("input-256k", 1, "per_1m_tokens_input")), true);
+    assert.equal(isHeadlineTier(priced("input", 1, "per_1m_tokens_input", { processing: "standard" })), true);
+  });
+
+  test("rejects batch / flex / cached tiers, by attribute or by id prefix", () => {
+    assert.equal(isHeadlineTier(priced("batch-input", 1, "per_1m_tokens_input", { processing: "batch" })), false);
+    assert.equal(isHeadlineTier(priced("input", 1, "per_1m_tokens_input", { processing: "flex" })), false);
+    assert.equal(isHeadlineTier(priced("batch-input", 1, "per_1m_tokens_input")), false);
+    assert.equal(isHeadlineTier(priced("cached-input", 1, "per_1m_tokens_input")), false);
+  });
+});
+
+describe("normalise headline price (SCO-646)", () => {
+  test("a model with a cheaper Batch tier is priced at its Standard rate ($30/$180)", () => {
+    const result = normalise(singleOffering("openai/gpt-5.5-pro", WITH_BATCH_TIERS));
+    assert.equal(result.inputPricePerM, 30);
+    assert.equal(result.outputPricePerM, 180);
+  });
+
+  test("a model priced only on context-length tiers is priced, not null ($1.87/$4.68)", () => {
+    const result = normalise(singleOffering("thinking-machines/inkling", CONTEXT_TIERS));
+    assert.equal(result.inputPricePerM, 1.87);
+    assert.equal(result.outputPricePerM, 4.68);
+  });
+
+  test("offering choice ignores Batch rates: a $20 Standard host beats a $30 host with $15 Batch", () => {
+    const entry = makeModelEntry({
+      model_id: "x/multi-host",
+      offerings: [
+        { slug: "batch-host", provider: "batch-host", quality_tier: "premium", tiers: WITH_BATCH_TIERS },
+        {
+          slug: "plain-host",
+          provider: "plain-host",
+          quality_tier: "premium",
+          tiers: [priced("input", 20, "per_1m_tokens_input"), priced("output", 60, "per_1m_tokens_output")],
+        },
+      ],
+    });
+    const result = normalise(entry);
+    assert.equal(result.provider, "plain-host");
+    assert.equal(result.inputPricePerM, 20);
+  });
+
+  test("headlinePrice returns null when no headline tier has the unit", () => {
+    assert.equal(headlinePrice([priced("batch-input", 15, "per_1m_tokens_input", { processing: "batch" })], "per_1m_tokens_input"), null);
+    assert.equal(headlinePrice([], "per_1m_tokens_input"), null);
   });
 });

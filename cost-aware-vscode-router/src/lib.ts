@@ -114,6 +114,8 @@ export interface PricingEntry {
 
 export interface Tier {
   id: string;
+  /** e.g. `{ processing: "batch" }` on a discounted Batch/Flex tier (SCO-646). */
+  attributes?: Record<string, unknown>;
   pricing: PricingEntry[];
 }
 
@@ -312,6 +314,45 @@ export function currentPrice(tiers: Tier[], id: string): number | null {
   return tier.pricing[tier.pricing.length - 1].amount;
 }
 
+/** Tier-id prefixes that mark a discounted / non-standard rate even when the
+ *  tier carries no `attributes.processing` (a guard for future entries). */
+const NON_HEADLINE_TIER_ID = /^(batch|flex|cached|cache)-/;
+
+/**
+ * SCO-646 (the SCO-640 rule, same as modelglass.com.au and the MCP tools):
+ * whether a tier's price may stand in for a model's headline (list) price.
+ * Batch/Flex/cached-input tiers are real rates but not the list price, so
+ * they never win a "cheapest" pick. Context-length tiers (`input-64k` /
+ * `input-256k`) stay eligible, so the lowest base rate wins by convention.
+ * Same rule as ../../pricing-math's isHeadlineTier — keep them in sync.
+ */
+export function isHeadlineTier(tier: Tier): boolean {
+  const processing = tier.attributes?.processing;
+  if (processing !== undefined && processing !== null && processing !== "standard") return false;
+  return !NON_HEADLINE_TIER_ID.test(tier.id);
+}
+
+/**
+ * An offering's headline price for one billing unit: the cheapest current
+ * price across its headline tiers of that unit (e.g. `per_1m_tokens_input`).
+ * Replaces reading the tier literally named `input`, which missed models
+ * priced only on context-length tiers (inkling: `input-64k` / `input-256k`)
+ * and would have picked up a Standard tier named anything else wrongly.
+ */
+export function headlinePrice(tiers: Tier[], unit: string): number | null {
+  let best: number | null = null;
+  for (const tier of tiers) {
+    if (!isHeadlineTier(tier) || !tier.pricing.length) continue;
+    const latest = tier.pricing[tier.pricing.length - 1];
+    if (latest.unit !== unit) continue;
+    if (best === null || latest.amount < best) best = latest.amount;
+  }
+  return best;
+}
+
+export const INPUT_UNIT = "per_1m_tokens_input";
+export const OUTPUT_UNIT = "per_1m_tokens_output";
+
 export function normalise(m: ModelEntry): NormalisedModel {
   const cap = m.knowledge?.capability_profile ?? [];
   let codingRating: string | null = null;
@@ -325,8 +366,8 @@ export function normalise(m: ModelEntry): NormalisedModel {
   const hasSweBenchPro = benchmarks?.some((b) => b.benchmark === "swe-bench-pro") ?? false;
   const offering = [...m.offerings].sort(
     (a, b) =>
-      (currentPrice(a.tiers, "input") ?? Infinity) -
-      (currentPrice(b.tiers, "input") ?? Infinity),
+      (headlinePrice(a.tiers, INPUT_UNIT) ?? Infinity) -
+      (headlinePrice(b.tiers, INPUT_UNIT) ?? Infinity),
   )[0];
   return {
     name: m.name,
@@ -338,8 +379,8 @@ export function normalise(m: ModelEntry): NormalisedModel {
     sweBenchVerified,
     sweBenchSource,
     hasSweBenchPro,
-    inputPricePerM: offering ? currentPrice(offering.tiers, "input") : null,
-    outputPricePerM: offering ? currentPrice(offering.tiers, "output") : null,
+    inputPricePerM: offering ? headlinePrice(offering.tiers, INPUT_UNIT) : null,
+    outputPricePerM: offering ? headlinePrice(offering.tiers, OUTPUT_UNIT) : null,
   };
 }
 

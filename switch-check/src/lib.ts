@@ -44,6 +44,8 @@ export type {
 export {
   currentPrice,
   collectCurrentPrices,
+  collectHeadlinePrices,
+  isHeadlineTier,
   comparePrices,
   daysBetween,
   analyzeHistory,
