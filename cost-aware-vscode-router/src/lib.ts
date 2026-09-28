@@ -110,6 +110,9 @@ export interface PricingEntry {
   currency: string;
   unit: string;
   effective_from: string;
+  /** Inclusive last day; absent while open-ended (ADR-0002). */
+  effective_to?: string;
+  region?: string;
 }
 
 export interface Tier {
@@ -310,8 +313,32 @@ export function sweBenchVerifiedScore(
 
 export function currentPrice(tiers: Tier[], id: string): number | null {
   const tier = tiers.find((t) => t.id === id);
-  if (!tier || !tier.pricing.length) return null;
-  return tier.pricing[tier.pricing.length - 1].amount;
+  if (!tier) return null;
+  return activePrice(tier.pricing)?.amount ?? null;
+}
+
+/**
+ * SCO-662: the current row in a tier's pricing[] history (ADR-0002) — same
+ * rule as @modelglass/core's activePrice() since SCO-661 and
+ * ../../pricing-math's activePrice(); keep them in sync. A row is current when
+ * it has started, hasn't passed an explicit effective_to, and no
+ * later-started row exists in the same region/currency/unit. Null when nothing
+ * is current (a retired tier). This used to read the LAST array element, so a
+ * retired tier kept its last price and a future-dated row counted early.
+ */
+export function activePrice(
+  pricing: readonly PricingEntry[],
+  today: string = new Date().toISOString().slice(0, 10),
+): PricingEntry | null {
+  const scope = (p: PricingEntry) => `${p.region ?? "global"}\0${p.currency}\0${p.unit}`;
+  const started = pricing.filter((p) => p.effective_from <= today);
+  const current = started.filter(
+    (p) =>
+      (!p.effective_to || p.effective_to >= today) &&
+      !started.some((q) => q !== p && scope(q) === scope(p) && q.effective_from > p.effective_from),
+  );
+  current.sort((a, b) => a.effective_from.localeCompare(b.effective_from));
+  return current[current.length - 1] ?? null;
 }
 
 /** Tier-id prefixes that mark a discounted / non-standard rate even when the
@@ -342,9 +369,9 @@ export function isHeadlineTier(tier: Tier): boolean {
 export function headlinePrice(tiers: Tier[], unit: string): number | null {
   let best: number | null = null;
   for (const tier of tiers) {
-    if (!isHeadlineTier(tier) || !tier.pricing.length) continue;
-    const latest = tier.pricing[tier.pricing.length - 1];
-    if (latest.unit !== unit) continue;
+    if (!isHeadlineTier(tier)) continue;
+    const latest = activePrice(tier.pricing); // SCO-662: current row, not the last array element
+    if (!latest || latest.unit !== unit) continue;
     if (best === null || latest.amount < best) best = latest.amount;
   }
   return best;

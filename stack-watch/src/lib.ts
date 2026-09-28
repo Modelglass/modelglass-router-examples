@@ -101,7 +101,11 @@ export interface CompetitorEntry {
   model_id: string | null;
   model_name: string | null;
   provider: string | null;
+  /** Null for a retired/withdrawn competitor (modelglass #585, SCO-661). */
   current_price: { amount: number; currency: string; unit: string } | null;
+  /** Set only when current_price is null: its last price and last day. Never live. */
+  last_price?: { amount: number; currency: string; unit: string; effective_to: string | null } | null;
+  /** Null when either side has no current price, or the units differ. */
   price_delta_ratio: number | null;
   notes: string | null;
 }
@@ -255,16 +259,34 @@ export function requireApiKey(): string {
 // Current-price resolution
 // ---------------------------------------------------------------------------
 
-/** The active price in a tier's pricing[] history — the entry with no
- *  effective_to (still in force), falling back to the most recent by
- *  effective_from. Mirrors packages/api's own currentPrice() convention
- *  (competitors.ts) so "current" means the same thing here as it does in
- *  the API's own competitor-ranking logic. */
-export function currentPrice(tier: Tier): PriceEntry | null {
-  const active = tier.pricing.find((p) => !p.effective_to);
-  if (active) return active;
-  if (!tier.pricing.length) return null;
-  return [...tier.pricing].sort((a, b) => (a.effective_from > b.effective_from ? -1 : 1))[0]!;
+/** The current price in a tier's pricing[] history (ADR-0002), same rule as
+ *  @modelglass/core's activePrice() since SCO-661 (modelglass #585): a row is
+ *  current when it has started, hasn't passed an explicit effective_to, and no
+ *  later-started row exists in the same region/currency/unit (the later row
+ *  implicitly supersedes it, even after that later row has itself ended).
+ *  When several rows are current (different units), the latest wins. Null
+ *  when nothing is current — a retired tier has no current price.
+ *  SCO-662: this used to take the FIRST row without an effective_to (DeepSeek
+ *  V4-Pro's superseded $0.435 instead of $1.32) and fall back to the most
+ *  recent row when all had ended (a retired model's last price as current). */
+export function currentPrice(tier: Tier, today: string = new Date().toISOString().slice(0, 10)): PriceEntry | null {
+  return activePrice(tier.pricing, today);
+}
+
+/** SCO-662: the rule behind currentPrice(), on a bare pricing[] array. */
+export function activePrice<P extends PriceEntry>(
+  pricing: readonly P[],
+  today: string = new Date().toISOString().slice(0, 10),
+): P | null {
+  const scope = (p: PriceEntry) => `${(p as { region?: string }).region ?? "global"}\0${p.currency}\0${p.unit}`;
+  const started = pricing.filter((p) => p.effective_from <= today);
+  const current = started.filter(
+    (p) =>
+      (!p.effective_to || p.effective_to >= today) &&
+      !started.some((q) => q !== p && scope(q) === scope(p) && q.effective_from > p.effective_from),
+  );
+  current.sort((a, b) => a.effective_from.localeCompare(b.effective_from));
+  return current[current.length - 1] ?? null;
 }
 
 // ---------------------------------------------------------------------------

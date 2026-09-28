@@ -80,7 +80,11 @@ export interface CompetitorEntry {
   model_id: string | null;
   model_name: string | null;
   provider: string | null;
+  /** Null for a retired/withdrawn competitor (modelglass #585, SCO-661). */
   current_price: { amount: number; currency: string; unit: string } | null;
+  /** Set only when current_price is null: its last price and last day. Never live. */
+  last_price?: { amount: number; currency: string; unit: string; effective_to: string | null } | null;
+  /** Null when either side has no current price, or the units differ. */
   price_delta_ratio: number | null;
   notes: string | null;
 }

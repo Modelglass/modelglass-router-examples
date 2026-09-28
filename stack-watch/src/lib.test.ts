@@ -80,7 +80,7 @@ describe("currentPrice", () => {
     assert.equal(currentPrice(tier)?.amount, 1.1);
   });
 
-  test("falls back to the most recent effective_from when nothing is open-ended", () => {
+  test("no current price when every row has ended (retired tier; SCO-662 — no fallback)", () => {
     const tier: Tier = {
       id: "input",
       pricing: [
@@ -88,12 +88,36 @@ describe("currentPrice", () => {
         { amount: 1.2, currency: "USD", unit: "per_1m_tokens_input", effective_from: "2026-06-01", effective_to: "2026-06-15" },
       ],
     };
-    assert.equal(currentPrice(tier)?.amount, 1.2);
+    assert.equal(currentPrice(tier), null);
   });
 
   test("returns null for an empty pricing array", () => {
     assert.equal(currentPrice({ id: "input", pricing: [] }), null);
   });
+
+  // SCO-662: same rule as @modelglass/core activePrice() since SCO-661.
+  const row = (amount: number, from: string, to?: string, unit = "per_1m_tokens_input") => ({
+    amount, currency: "USD", unit, effective_from: from, ...(to ? { effective_to: to } : {}),
+  });
+  const TODAY = "2026-09-28";
+
+  test("DeepSeek V4-Pro shape: the later open row wins ($1.32, not the superseded $0.435)", () => {
+    assert.equal(currentPrice({ id: "input", pricing: [row(0.435, "2026-08-04"), row(1.32, "2026-08-16")] }, TODAY)?.amount, 1.32);
+  });
+
+  test("DeepSeek V4-Flash shape: superseded open row + ended later row = no current price", () => {
+    assert.equal(currentPrice({ id: "input", pricing: [row(0.14, "2026-08-04"), row(0.44, "2026-08-16", "2026-09-09")] }, TODAY), null);
+  });
+
+  test("o3 shape (closed row then open row) is unchanged", () => {
+    assert.equal(currentPrice({ id: "input", pricing: [row(10, "2025-04-16", "2026-08-28"), row(2, "2026-08-29")] }, TODAY)?.amount, 2);
+  });
+
+  test("supersession is per unit, and a future row doesn't count yet", () => {
+    assert.equal(currentPrice({ id: "t", pricing: [row(1, "2026-01-01", undefined, "per_image"), row(2, "2026-02-01", "2026-03-01", "per_megapixel")] }, TODAY)?.amount, 1);
+    assert.equal(currentPrice({ id: "t", pricing: [row(1, "2026-01-01"), row(2, "2026-12-01")] }, TODAY)?.amount, 1);
+  });
+
 });
 
 // ---------------------------------------------------------------------------

@@ -298,11 +298,34 @@ export function filterByCapability(
 
 export const COMPARABLE_UNITS = new Set(["per_image", "per_megapixel"]);
 
-export function currentPrice(tier: Tier): PriceEntry | null {
-  const active = tier.pricing.find((p) => !p.effective_to);
-  if (active) return active;
-  if (!tier.pricing.length) return null;
-  return [...tier.pricing].sort((a, b) => (a.effective_from > b.effective_from ? -1 : 1))[0]!;
+/** The current price in a tier's pricing[] history (ADR-0002), same rule as
+ *  @modelglass/core's activePrice() since SCO-661 (modelglass #585): a row is
+ *  current when it has started, hasn't passed an explicit effective_to, and no
+ *  later-started row exists in the same region/currency/unit (the later row
+ *  implicitly supersedes it, even after that later row has itself ended).
+ *  When several rows are current (different units), the latest wins. Null
+ *  when nothing is current — a retired tier has no current price.
+ *  SCO-662: this used to take the FIRST row without an effective_to (DeepSeek
+ *  V4-Pro's superseded $0.435 instead of $1.32) and fall back to the most
+ *  recent row when all had ended (a retired model's last price as current). */
+export function currentPrice(tier: Tier, today: string = new Date().toISOString().slice(0, 10)): PriceEntry | null {
+  return activePrice(tier.pricing, today);
+}
+
+/** SCO-662: the rule behind currentPrice(), on a bare pricing[] array. */
+export function activePrice<P extends PriceEntry>(
+  pricing: readonly P[],
+  today: string = new Date().toISOString().slice(0, 10),
+): P | null {
+  const scope = (p: PriceEntry) => `${(p as { region?: string }).region ?? "global"}\0${p.currency}\0${p.unit}`;
+  const started = pricing.filter((p) => p.effective_from <= today);
+  const current = started.filter(
+    (p) =>
+      (!p.effective_to || p.effective_to >= today) &&
+      !started.some((q) => q !== p && scope(q) === scope(p) && q.effective_from > p.effective_from),
+  );
+  current.sort((a, b) => a.effective_from.localeCompare(b.effective_from));
+  return current[current.length - 1] ?? null;
 }
 
 export interface RankedOffering {
