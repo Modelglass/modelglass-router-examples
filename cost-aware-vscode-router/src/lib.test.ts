@@ -16,6 +16,7 @@ import {
   type Tier,
   codingQualityBar,
   deviationType,
+  currentPrice,
   headlinePrice,
   isHeadlineTier,
   normalise,
@@ -365,5 +366,17 @@ describe("normalise headline price (SCO-646)", () => {
   test("headlinePrice returns null when no headline tier has the unit", () => {
     assert.equal(headlinePrice([priced("batch-input", 15, "per_1m_tokens_input", { processing: "batch" })], "per_1m_tokens_input"), null);
     assert.equal(headlinePrice([], "per_1m_tokens_input"), null);
+  });
+
+  // SCO-662: current row per the SCO-661 rule, not the last array element.
+  test("headlinePrice uses DeepSeek V4-Pro's current $1.32, and V4-Flash (retired) has none", () => {
+    const tier = (id: string, rows: Array<[number, string, string?]>): Tier => ({
+      id,
+      pricing: rows.map(([amount, from, to]) => ({ amount, currency: "USD", unit: "per_1m_tokens_input", effective_from: from, ...(to ? { effective_to: to } : {}) })),
+    });
+    // Reverse array order on purpose: the last element is the superseded row.
+    assert.equal(headlinePrice([tier("input", [[1.32, "2026-08-16"], [0.435, "2026-08-04"]])], "per_1m_tokens_input"), 1.32);
+    assert.equal(headlinePrice([tier("input", [[0.14, "2026-08-04"], [0.44, "2026-08-16", "2026-09-09"]])], "per_1m_tokens_input"), null);
+    assert.equal(currentPrice([tier("input", [[0.14, "2026-08-04"], [0.44, "2026-08-16", "2026-09-09"]])], "input"), null);
   });
 });

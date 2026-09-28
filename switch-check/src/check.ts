@@ -294,6 +294,13 @@ async function main(): Promise<void> {
     if (c.model_id === fromModel.model_id) return "same model (a different host, not a migration)";
     if (!c.model_id || !models.some((m) => m.model_id === c.model_id))
       return "no resolvable model_id in the feed";
+    // SCO-662: since modelglass #585 a retired/withdrawn competitor has
+    // current_price null (last_price carries its last price) — not a target.
+    if (c.current_price === null)
+      return c.last_price
+        ? `no current price (retired or withdrawn; last price ${fmtPrice(c.last_price.amount, c.last_price.unit)}` +
+            `${c.last_price.effective_to ? `, until ${c.last_price.effective_to}` : ""})`
+        : "no current price (retired or withdrawn)";
     return null;
   };
   const resolvable = competitors.filter((c) => skipReason(c) === null);
