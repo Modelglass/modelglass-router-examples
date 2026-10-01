@@ -121,6 +121,10 @@ export function activePrice<P extends PriceEntry>(
  *  tier carries no `attributes.processing` (a guard for future entries). */
 const NON_HEADLINE_TIER_ID = /^(batch|flex|cached|cache)-/;
 
+/** ADR-0015: prompt-cache units are never a headline price, whatever the
+ *  tier is called (second guard alongside the tier-id prefix). */
+const NON_HEADLINE_UNITS: ReadonlySet<string> = new Set(["per_1m_tokens_cache_read", "per_1m_tokens_cache_write"]);
+
 /**
  * Whether a tier's price may stand in for a model's headline (list) price.
  * Discounted processing modes (Batch, Flex, cached input) are real rates but
@@ -136,6 +140,7 @@ const NON_HEADLINE_TIER_ID = /^(batch|flex|cached|cache)-/;
 export function isHeadlineTier(tier: Tier): boolean {
   const processing = tier.attributes?.processing;
   if (processing !== undefined && processing !== null && processing !== "standard") return false;
+  if (tier.pricing?.some((p) => NON_HEADLINE_UNITS.has(p.unit))) return false;
   return !NON_HEADLINE_TIER_ID.test(tier.id);
 }
 

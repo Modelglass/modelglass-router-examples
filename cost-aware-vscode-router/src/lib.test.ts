@@ -330,6 +330,12 @@ describe("isHeadlineTier", () => {
     assert.equal(isHeadlineTier(priced("batch-input", 1, "per_1m_tokens_input")), false);
     assert.equal(isHeadlineTier(priced("cached-input", 1, "per_1m_tokens_input")), false);
   });
+
+  test("rejects prompt-cache units whatever the tier id (ADR-0015)", () => {
+    assert.equal(isHeadlineTier(priced("cached-input", 0.1, "per_1m_tokens_cache_read")), false);
+    assert.equal(isHeadlineTier(priced("prompt-cache", 0.1, "per_1m_tokens_cache_read")), false);
+    assert.equal(isHeadlineTier(priced("writes", 2.5, "per_1m_tokens_cache_write")), false);
+  });
 });
 
 describe("normalise headline price (SCO-646)", () => {
