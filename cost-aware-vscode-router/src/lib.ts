@@ -345,6 +345,10 @@ export function activePrice(
  *  tier carries no `attributes.processing` (a guard for future entries). */
 const NON_HEADLINE_TIER_ID = /^(batch|flex|cached|cache)-/;
 
+/** ADR-0015: prompt-cache units are never a headline price, whatever the
+ *  tier is called (second guard alongside the tier-id prefix). */
+const NON_HEADLINE_UNITS: ReadonlySet<string> = new Set(["per_1m_tokens_cache_read", "per_1m_tokens_cache_write"]);
+
 /**
  * SCO-646 (the SCO-640 rule, same as modelglass.com.au and the MCP tools):
  * whether a tier's price may stand in for a model's headline (list) price.
@@ -356,6 +360,7 @@ const NON_HEADLINE_TIER_ID = /^(batch|flex|cached|cache)-/;
 export function isHeadlineTier(tier: Tier): boolean {
   const processing = tier.attributes?.processing;
   if (processing !== undefined && processing !== null && processing !== "standard") return false;
+  if (tier.pricing?.some((p) => NON_HEADLINE_UNITS.has(p.unit))) return false;
   return !NON_HEADLINE_TIER_ID.test(tier.id);
 }
 
