@@ -18,7 +18,7 @@ examples in this repo, there's no Free-tier mode here — see
 
 ## Why Free isn't enough (read before setup)
 
-Free-plan keys only see pricing history from the last ~2 days (ADR 0004).
+Free-plan keys only see pricing history from the last ~2 days.
 Meaningful drift detection needs to look back further than that for any
 realistic check-in cadence — a daily or weekly cron run needs to see
 whatever changed *since the last run*, and a 2-day window doesn't reliably
@@ -41,7 +41,7 @@ and a link to upgrade. It does not run in a caveated/degraded mode.
 - Node.js 20+
 - A Modelglass **Starter or Pro** key — [pricing](https://modelglass.com.au/signup)
   (Starter: 12-month pricing-history window. Pro: full history, no window
-  limit — the pricing-history gate, ADR 0004 internally)
+  limit)
 
 ---
 
@@ -245,15 +245,14 @@ Starter/Pro key.
 
 ## What's not here (intentional)
 
-- **Coding/science/agentic benchmark-score drift** — SCO-166's original
-  scope named coding/science/agentic alongside llm/image/video/audio as
-  modalities a stack can reference. A model id can absolutely belong to one
+- **Coding/science/agentic benchmark-score drift** — the original scope named
+  coding/science/agentic alongside llm/image/video/audio as modalities a
+  stack can reference. A model id can absolutely belong to one
   of those capability verticals — but the **paid API/MCP feed doesn't
   expose SWE-bench/GAIA/HLE benchmark data at all**, for any modality; that
-  data lives only in the sibling repos' own artifacts
-  (`modelglass-coding`/`-science`/`-agentic`), consumed exclusively by the
-  modelglass.com.au website build, never surfaced through `/v1/` or the MCP
-  tools. So a coding-focused stack entry still gets full pricing/lifecycle/
+  data lives only in Modelglass's separate capability-benchmark registries,
+  shown on the modelglass.com.au leaderboards rather than through this
+  tool. So a coding-focused stack entry still gets full pricing/lifecycle/
   `capability_profile.coding` (qualitative rating) drift — the same as any
   other model — just not a numeric benchmark-score delta, because the live
   feed a real customer calls has no such field to diff. (This mirrors

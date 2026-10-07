@@ -15,8 +15,7 @@ in that model's live capability data from the
 
 ## Why this exists, and why it's opt-in
 
-This is [SCO-357](https://linear.app/scott-schinkel/issue/SCO-357/explore-llm-in-the-loop-prompt-enhancement-for-multi-modal-byok) —
-the video half of it. A human's rough prompt into a video model is usually
+This is the video half of Modelglass's LLM-in-the-loop prompt refinement. A human's rough prompt into a video model is usually
 weaker than what a capability-grounded rewrite produces, the same way
 `av-prompt-refiner` and `image-prompt-refiner` already demonstrate for their
 verticals. This tool is a demonstrably better way to get **consistent,
@@ -45,9 +44,8 @@ it for cheap/fast exploratory passes where the rough prompt is good enough.
 **Access model**: this is a Pro-gated capability in the product sense (a
 Modelglass API key still authenticates every registry/routing call this
 tool makes either way — actual plan enforcement is a site-side concern, not
-something this CLI example enforces itself; see
-[`packages/api`](https://github.com/Modelglass/modelglass/tree/main/packages/api)'s
-plan-gating for where that actually lives).
+something this CLI example enforces itself; the Modelglass API applies the
+plan gating).
 
 ---
 
@@ -177,8 +175,8 @@ wins, every exclusion cited by field.
   explicitly rather than silently narrowing the pool.
 
 **Verified against the live registry (2026-08-07)** — the actual routing
-outcome, computed from the same `ontology/models/*.yaml` +
-`registry/models/*.yaml` data the MCP tool serves (not simulated):
+outcome, computed from the same registry data the MCP tool serves (not
+simulated):
 
 | Job | Reasoning bar | Cheapest qualifying Anthropic model | Input price |
 |---|---|---|---|
@@ -251,9 +249,5 @@ npm run refine-shots -- --demo
 ---
 
 ---
-
-_Repo note: merges to this repo's `main` now publish to modelglass.com.au/routers
-automatically (SCO-197, 2026-07-13) — no manual nudge to the main site repo
-required._
 
 Copyright © 2026 Modelglass Pty Ltd. Licensed under the MIT License — see [LICENSE](../LICENSE).

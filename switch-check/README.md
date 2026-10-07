@@ -14,7 +14,7 @@ evidence, not a verdict. Works on every plan tier, including Free.
 **Works on a Free key.** The current-price delta, capability diff, unit
 warnings, and lifecycle checks are all computed from data every tier sees in
 full. The price-*stability* section is computed from whatever slice of the
-pricing history your plan's window exposes (ADR 0004 internally), and says so
+pricing history your plan's window exposes, and says so
 in the output: on Free it states, for that specific run, exactly what Starter
 (12-month window) and Pro (full history) would add.
 

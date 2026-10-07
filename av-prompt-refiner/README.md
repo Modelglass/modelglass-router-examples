@@ -35,8 +35,8 @@ different shapes of data: this one via `modelglass_get_model` (a single
 model's full profile, to ground the prompt-refinement guidance), where
 `cost-aware-vscode-router` uses `modelglass_list_models` (the bulk pool, for
 ranking/selection). See
-[`docs/mcp-usage.md`](https://github.com/Modelglass/modelglass/blob/main/docs/mcp-usage.md)
-in the main repo for the full MCP contract.
+the [Modelglass API docs](https://modelglass.com.au/api-docs) for the full
+MCP contract.
 
 ---
 
