@@ -40,9 +40,7 @@ coordinate with.
 
 ## What's genuinely different from `av-prompt-refiner` (video/audio)
 
-The image ontology schema
-([`ontology/schema/model-knowledge.schema.json`](https://github.com/Modelglass/modelglass/blob/main/ontology/schema/model-knowledge.schema.json)
-in the main repo) has **no modality-specific structured fields** the way
+Modelglass's image model profiles have **no modality-specific structured fields** the way
 video and audio do. Video entries carry typed fields like
 `max_clip_duration`, `supported_resolutions`, and `generation_modes`; audio
 entries carry `voice_cloning`, `ssml_support`, `sub_modality`. Image entries
@@ -194,8 +192,8 @@ the **Modelglass HTTP MCP endpoint** directly over JSON-RPC via
 `modelglass_get_model` (a single model's full profile, to ground the
 prompt-refinement guidance) — the tool surface an agent or IDE integration
 would actually use. See
-[`docs/mcp-usage.md`](https://github.com/Modelglass/modelglass/blob/main/docs/mcp-usage.md)
-in the main repo for the full MCP contract.
+the [Modelglass API docs](https://modelglass.com.au/api-docs) for the full
+MCP contract.
 
 ---
 

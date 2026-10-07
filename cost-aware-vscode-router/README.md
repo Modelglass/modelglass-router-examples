@@ -14,10 +14,8 @@ need them.
 
 ## Background
 
-This is the CLI-script core of SCO-139 (VS Code cost-aware task router). The
-full design spec is in
-[`docs/specs/sco-139-orchestrator-routing-design.md`](https://github.com/Modelglass/modelglass/blob/main/docs/specs/sco-139-orchestrator-routing-design.md)
-in the main Modelglass repo.
+This is the CLI-script core of the VS Code cost-aware task router
+([Modelglass Cost-Aware Router](https://marketplace.visualstudio.com/items?itemName=modelglass.cost-aware-router)).
 
 **Placement decision (2026-07-01):** this repo is the canonical home for the
 routing logic. The VS Code extension, MCP tool, and CLI wrapper all build on top
@@ -274,12 +272,12 @@ run each subtask: Claude Code, a custom agent, direct API calls, or now
 
 ## What's not here (intentional)
 
-- **Token-spend measurement/tracking** — deferred; see SCO-139.
+- **Token-spend measurement/tracking** — deferred.
 - **VS Code extension** — `Route Task`'s ranking is surface layer, vendoring
   this script directly; its separate `Run Task` command (0.3.0+) adds
   independent execution using your own provider key, not built on this repo —
   see "Why the router doesn't execute subtasks itself" above.
-- **MCP tool** — same (surface layer, not yet built — SCO-235).
+- **MCP tool** — same (surface layer, not yet built).
 - **Task decomposition** — the caller tags subtasks at decomposition time.
   No router-calling-a-router.
 

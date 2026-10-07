@@ -12,7 +12,7 @@ generation calls, no provider keys beyond the Modelglass API key, no real
 spend, fully reproducible output — see
 ["What's not here"](#whats-not-here-intentional) below.
 
-Pairs with [shot-prompt-refiner](../shot-prompt-refiner/README.md) (SCO-357):
+Pairs with [shot-prompt-refiner](../shot-prompt-refiner/README.md):
 plan the shots here, then refine each shot's rough prompt to fit its picked
 model there. Separate tool, separate codebase, separate opt-in step — this
 tool's no-generation-call, no-LLM-call scope is unchanged by that pairing.
@@ -21,8 +21,7 @@ tool's no-generation-call, no-LLM-call scope is unchanged by that pairing.
 
 ## Background
 
-This is [SCO-190](https://linear.app/scott-schinkel/issue/SCO-190/build-router-example-shot-plan-compiler-storyboard-in-model-picks) —
-"shot-plan compiler," which absorbed an earlier idea (SCO-189, multi-model
+This is the "shot-plan compiler," which absorbed an earlier idea (multi-model
 video routing via last-frame handoff) after a review concluded the two ideas
 were one example, not two, and that the *planner* half — the one that
 actually needs nothing but registry data to be real — is the right half to
@@ -73,7 +72,7 @@ node --import tsx/esm shot-plan-compiler/src/plan.ts my-storyboard.json
 npm run plan -- --demo --alternates
 ```
 
-**Emit machine-readable JSON instead of the text report** (SCO-357 — feeds
+**Emit machine-readable JSON instead of the text report** (feeds
 [shot-prompt-refiner](../shot-prompt-refiner/README.md): plan the shots
 here, refine each shot's prompt there):
 
@@ -332,9 +331,5 @@ side by side.
 ---
 
 ---
-
-_Repo note: merges to this repo's `main` now publish to modelglass.com.au/routers
-automatically (SCO-197, 2026-07-13) — no manual nudge to the main site repo
-required._
 
 Copyright © 2026 Modelglass Pty Ltd. Licensed under the MIT License — see [LICENSE](../LICENSE).
