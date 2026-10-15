@@ -31,6 +31,10 @@ export interface PriceEntry {
   unit: string;
   effective_from: string;
   effective_to?: string;
+  region?: string;
+  /** ADR-0014: a corrected row, kept for history. Never current. The feed
+   *  drops these already; skipped here too so the rule matches core's. */
+  archived?: unknown;
   source?: PriceSource;
 }
 
@@ -93,17 +97,28 @@ export type PlanTier = "free" | "app" | "starter" | "pro" | "internal";
  *  SCO-662: this used to take the FIRST row without an effective_to (DeepSeek
  *  V4-Pro's superseded $0.435 instead of $1.32) and fall back to the most
  *  recent row when all had ended (a retired model's last price as current). */
-export function currentPrice(tier: Tier, today: string = new Date().toISOString().slice(0, 10)): PriceEntry | null {
+export function currentPrice(tier: Tier, today: string = todayIso()): PriceEntry | null {
   return activePrice(tier.pricing, today);
 }
+
+/** Today as an ISO date (UTC), the default "today" for every helper here.
+ *  SCO-735: every function that picks a current price takes `today`, so
+ *  tests and callers can pin it. */
+export function todayIso(now: Date = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
+/** ADR-0002's supersession scope: a later row replaces an earlier one only
+ *  within the same region, currency and unit. */
+const priceScope = (p: PriceEntry) => `${p.region ?? "global"}\0${p.currency}\0${p.unit}`;
 
 /** SCO-662: the rule behind currentPrice(), on a bare pricing[] array. */
 export function activePrice<P extends PriceEntry>(
   pricing: readonly P[],
-  today: string = new Date().toISOString().slice(0, 10),
+  today: string = todayIso(),
 ): P | null {
-  const scope = (p: PriceEntry) => `${(p as { region?: string }).region ?? "global"}\0${p.currency}\0${p.unit}`;
-  const started = pricing.filter((p) => p.effective_from <= today);
+  const scope = priceScope;
+  const started = pricing.filter((p) => !p.archived && p.effective_from <= today);
   const current = started.filter(
     (p) =>
       (!p.effective_to || p.effective_to >= today) &&
@@ -177,22 +192,22 @@ export interface PriceComparison {
 
 /** All current prices for a model, one per offering×tier — discounted
  *  Batch/Flex/cached tiers included (see collectHeadlinePrices). */
-export function collectCurrentPrices(model: ModelEntry): OfferPrice[] {
-  return collectPrices(model, () => true);
+export function collectCurrentPrices(model: ModelEntry, today: string = todayIso()): OfferPrice[] {
+  return collectPrices(model, () => true, today);
 }
 
 /** Current prices from headline tiers only (see isHeadlineTier) — the rates
  *  that compete in a "cheapest per unit" pick. */
-export function collectHeadlinePrices(model: ModelEntry): OfferPrice[] {
-  return collectPrices(model, isHeadlineTier);
+export function collectHeadlinePrices(model: ModelEntry, today: string = todayIso()): OfferPrice[] {
+  return collectPrices(model, isHeadlineTier, today);
 }
 
-function collectPrices(model: ModelEntry, include: (tier: Tier) => boolean): OfferPrice[] {
+function collectPrices(model: ModelEntry, include: (tier: Tier) => boolean, today: string): OfferPrice[] {
   const prices: OfferPrice[] = [];
   for (const off of model.offerings) {
     for (const tier of off.tiers) {
       if (!include(tier)) continue;
-      const p = currentPrice(tier);
+      const p = currentPrice(tier, today);
       if (!p) continue;
       prices.push({
         provider: off.provider,
@@ -215,9 +230,9 @@ function collectPrices(model: ModelEntry, include: (tier: Tier) => boolean): Off
  *  when the units match). Only headline tiers compete (SCO-646): a Batch rate
  *  never stands in for the list price. Units present on one side only are
  *  reported as-is, never converted. */
-export function comparePrices(fromModel: ModelEntry, toModel: ModelEntry): PriceComparison {
-  const fromPrices = collectHeadlinePrices(fromModel);
-  const toPrices = collectHeadlinePrices(toModel);
+export function comparePrices(fromModel: ModelEntry, toModel: ModelEntry, today: string = todayIso()): PriceComparison {
+  const fromPrices = collectHeadlinePrices(fromModel, today);
+  const toPrices = collectHeadlinePrices(toModel, today);
 
   const byUnit = (prices: OfferPrice[]) => {
     const m = new Map<string, OfferPrice[]>();
@@ -295,17 +310,22 @@ export function daysBetween(fromIso: string, to: Date): number {
 }
 
 /** Stability analysis for one offering×tier, computed from whatever slice of
- *  the append-only pricing[] history the caller's plan window exposes. */
+ *  the append-only pricing[] history the caller's plan window exposes.
+ *  `today` also decides which row is current (SCO-735: it used to be the
+ *  wall clock, whatever `today` said). "Previous" is the latest earlier row
+ *  in the same region/currency/unit; a scheduled future row is never
+ *  previous or current. */
 export function analyzeHistory(
   provider: string,
   tier: Tier,
   today: Date = new Date(),
 ): HistoryAnalysis | null {
-  const cur = currentPrice(tier);
+  const cur = currentPrice(tier, todayIso(today));
   if (!cur) return null;
-  const sorted = [...tier.pricing].sort((a, b) => (a.effective_from > b.effective_from ? -1 : 1));
-  const curIdx = sorted.indexOf(cur);
-  const prev = curIdx >= 0 ? (sorted[curIdx + 1] ?? null) : null;
+  const earlier = tier.pricing
+    .filter((p) => !p.archived && priceScope(p) === priceScope(cur) && p.effective_from < cur.effective_from)
+    .sort((a, b) => a.effective_from.localeCompare(b.effective_from));
+  const prev = earlier[earlier.length - 1] ?? null;
   return {
     provider,
     tier_id: tier.id,
