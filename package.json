@@ -23,7 +23,7 @@
     "check": "node --import tsx/esm switch-check/src/check.ts",
     "plan": "node --import tsx/esm shot-plan-compiler/src/plan.ts",
     "refine-shots": "node --import tsx/esm shot-prompt-refiner/src/refine.ts",
-    "test": "node --import tsx/esm --test cost-aware-vscode-router/src/*.test.ts av-prompt-refiner/src/*.test.ts stack-watch/src/*.test.ts image-batch-coster/src/*.test.ts switch-check/src/*.test.ts shot-plan-compiler/src/*.test.ts image-prompt-refiner/src/*.test.ts shot-prompt-refiner/src/*.test.ts",
+    "test": "node --import tsx/esm --test pricing-math/src/*.test.ts cost-aware-vscode-router/src/*.test.ts av-prompt-refiner/src/*.test.ts stack-watch/src/*.test.ts image-batch-coster/src/*.test.ts switch-check/src/*.test.ts shot-plan-compiler/src/*.test.ts image-prompt-refiner/src/*.test.ts shot-prompt-refiner/src/*.test.ts",
     "build:pricing-math": "tsc -p pricing-math/tsconfig.json",
     "prepare": "npm run build:pricing-math"
   },
