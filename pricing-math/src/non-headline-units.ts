@@ -8,6 +8,7 @@
 export const NON_HEADLINE_UNIT_LIST = [
   "per_1m_tokens_cache_read",
   "per_1m_tokens_cache_write",
+  "per_input_video_second",
 ] as const;
 
 export const NON_HEADLINE_UNITS: ReadonlySet<string> = new Set(NON_HEADLINE_UNIT_LIST);
