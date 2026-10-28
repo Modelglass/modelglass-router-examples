@@ -21,6 +21,7 @@ import {
   analyzeHistory,
   analyzeModelHistory,
   collectCurrentPrices,
+  isHeadlineTier,
   collectHeadlinePrices,
   comparePrices,
   todayIso,
@@ -179,5 +180,25 @@ describe("NON_HEADLINE_UNITS (SCO-653: one list, generated from @modelglass/core
   test("includes the ADR-0015 prompt-cache units", () => {
     assert.ok(NON_HEADLINE_UNITS.has("per_1m_tokens_cache_read"));
     assert.ok(NON_HEADLINE_UNITS.has("per_1m_tokens_cache_write"));
+  });
+});
+
+// Mirrors Runway's seedance2_5 (SCO-813): 30 credits/s of 720p output plus
+// 15 credits/s of input or reference video. The input rate is cheaper per
+// second but is an add-on, never the clip's headline price.
+const SEEDANCE_25 = model("bytedance/seedance-2.5", "seedance-2-5-runway", "runway", [
+  { id: "standard-720p", pricing: [row(0.3, "per_second", "2026-10-01")] },
+  { id: "input-video-720p", pricing: [row(0.15, "per_input_video_second", "2026-10-01")] },
+]);
+
+describe("input-video seconds are never a headline price (SCO-813)", () => {
+  test("collectHeadlinePrices keeps the output rate and drops the input-video rate", () => {
+    assert.deepEqual(amountsByTier(collectHeadlinePrices(SEEDANCE_25, TODAY)), { "standard-720p": 0.3 });
+  });
+  test("collectCurrentPrices still lists both", () => {
+    assert.deepEqual(amountsByTier(collectCurrentPrices(SEEDANCE_25, TODAY)), { "standard-720p": 0.3, "input-video-720p": 0.15 });
+  });
+  test("isHeadlineTier rejects it whatever the tier is called", () => {
+    assert.equal(isHeadlineTier({ id: "standard", pricing: [row(0.15, "per_input_video_second", "2026-10-01")] }), false);
   });
 });

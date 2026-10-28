@@ -394,3 +394,14 @@ describe("NON_HEADLINE_UNITS (SCO-653)", () => {
     assert.equal(NON_HEADLINE_UNITS, PricingMath.NON_HEADLINE_UNITS);
   });
 });
+
+describe("input-video seconds are never a headline price (SCO-813)", () => {
+  const tiers = [priced("standard-720p", 0.3, "per_second"), priced("input-video-720p", 0.15, "per_input_video_second")];
+  test("isHeadlineTier rejects a per_input_video_second tier whatever it's called", () => {
+    assert.equal(isHeadlineTier(priced("standard", 0.15, "per_input_video_second")), false);
+  });
+  test("headlinePrice never returns the input-video rate", () => {
+    assert.equal(headlinePrice(tiers, "per_second"), 0.3);
+    assert.equal(headlinePrice(tiers, "per_input_video_second"), null);
+  });
+});
