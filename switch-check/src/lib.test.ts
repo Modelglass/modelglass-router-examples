@@ -22,6 +22,7 @@ import {
   unitWarnings,
   lifecycleCheck,
 } from "./lib.js";
+import * as PricingMath from "../../pricing-math/src/index.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -519,5 +520,11 @@ describe("comparePrices headline tiers (SCO-646)", () => {
   test("collectCurrentPrices still lists discounted tiers; collectHeadlinePrices drops them", () => {
     assert.equal(collectCurrentPrices(WITH_BATCH).length, 4);
     assert.deepEqual(collectHeadlinePrices(WITH_BATCH).map((p) => p.tier_id), ["input", "output"]);
+  });
+});
+
+describe("isHeadlineTier (SCO-653)", () => {
+  test("is pricing-math's rule, not a copy", () => {
+    assert.equal(isHeadlineTier, PricingMath.isHeadlineTier);
   });
 });

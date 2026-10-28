@@ -24,6 +24,8 @@ import {
   collectHeadlinePrices,
   comparePrices,
   todayIso,
+  NON_HEADLINE_UNITS,
+  NON_HEADLINE_UNIT_LIST,
 } from "./index.js";
 
 const IN = "per_1m_tokens_input";
@@ -167,4 +169,15 @@ describe("SCO-735: today is injectable and every helper agrees with activePrice(
       });
     }
   }
+});
+
+describe("NON_HEADLINE_UNITS (SCO-653: one list, generated from @modelglass/core)", () => {
+  test("the set is exactly the generated list, with no duplicates", () => {
+    assert.deepEqual([...NON_HEADLINE_UNITS].sort(), [...NON_HEADLINE_UNIT_LIST].sort());
+    assert.equal(NON_HEADLINE_UNITS.size, NON_HEADLINE_UNIT_LIST.length);
+  });
+  test("includes the ADR-0015 prompt-cache units", () => {
+    assert.ok(NON_HEADLINE_UNITS.has("per_1m_tokens_cache_read"));
+    assert.ok(NON_HEADLINE_UNITS.has("per_1m_tokens_cache_write"));
+  });
 });

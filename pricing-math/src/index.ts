@@ -15,6 +15,8 @@
  * `exports` subpath) — MIT, same as the rest of this repo (see ../LICENSE).
  */
 
+import { NON_HEADLINE_UNITS, NON_HEADLINE_UNIT_LIST } from "./non-headline-units.js";
+
 // ---------------------------------------------------------------------------
 // Types — Modelglass feed (the subset these functions read)
 // ---------------------------------------------------------------------------
@@ -136,9 +138,10 @@ export function activePrice<P extends PriceEntry>(
  *  tier carries no `attributes.processing` (a guard for future entries). */
 const NON_HEADLINE_TIER_ID = /^(batch|flex|cached|cache)-/;
 
-/** ADR-0015: prompt-cache units are never a headline price, whatever the
- *  tier is called (second guard alongside the tier-id prefix). */
-const NON_HEADLINE_UNITS: ReadonlySet<string> = new Set(["per_1m_tokens_cache_read", "per_1m_tokens_cache_write"]);
+// ADR-0015: non-headline units (prompt cache, …) are never a headline price,
+// whatever the tier is called (second guard alongside the tier-id prefix).
+// One list, generated from @modelglass/core (SCO-653); see the file itself.
+export { NON_HEADLINE_UNITS, NON_HEADLINE_UNIT_LIST };
 
 /**
  * Whether a tier's price may stand in for a model's headline (list) price.
@@ -150,7 +153,8 @@ const NON_HEADLINE_UNITS: ReadonlySet<string> = new Set(["per_1m_tokens_cache_re
  * the lowest short-context base rate still wins by convention.
  *
  * Same rule as the Modelglass site/API/MCP (SCO-640), so a model's headline
- * price here matches what modelglass.com.au shows. Keep the two in sync.
+ * price here matches what modelglass.com.au shows. The unit list is
+ * generated from core (./non-headline-units.ts); keep the rest in sync.
  */
 export function isHeadlineTier(tier: Tier): boolean {
   const processing = tier.attributes?.processing;

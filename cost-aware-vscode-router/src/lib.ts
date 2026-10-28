@@ -3,6 +3,8 @@
  * Used by route.ts, report.ts, and summary.ts.
  */
 
+import { NON_HEADLINE_UNITS } from "../../pricing-math/src/index.js";
+
 // ---------------------------------------------------------------------------
 // Types — task
 // ---------------------------------------------------------------------------
@@ -345,9 +347,10 @@ export function activePrice(
  *  tier carries no `attributes.processing` (a guard for future entries). */
 const NON_HEADLINE_TIER_ID = /^(batch|flex|cached|cache)-/;
 
-/** ADR-0015: prompt-cache units are never a headline price, whatever the
- *  tier is called (second guard alongside the tier-id prefix). */
-const NON_HEADLINE_UNITS: ReadonlySet<string> = new Set(["per_1m_tokens_cache_read", "per_1m_tokens_cache_write"]);
+// ADR-0015: non-headline units are never a headline price, whatever the tier
+// is called. The one list lives in pricing-math, generated from
+// @modelglass/core (SCO-653); this example doesn't keep its own copy.
+export { NON_HEADLINE_UNITS };
 
 /**
  * SCO-646 (the SCO-640 rule, same as modelglass.com.au and the MCP tools):
@@ -355,7 +358,8 @@ const NON_HEADLINE_UNITS: ReadonlySet<string> = new Set(["per_1m_tokens_cache_re
  * Batch/Flex/cached-input tiers are real rates but not the list price, so
  * they never win a "cheapest" pick. Context-length tiers (`input-64k` /
  * `input-256k`) stay eligible, so the lowest base rate wins by convention.
- * Same rule as ../../pricing-math's isHeadlineTier — keep them in sync.
+ * Same rule as ../../pricing-math's isHeadlineTier (and the same unit list,
+ * imported from it). Keep the rest in sync.
  */
 export function isHeadlineTier(tier: Tier): boolean {
   const processing = tier.attributes?.processing;

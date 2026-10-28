@@ -11,6 +11,13 @@
       "import": "./pricing-math/dist/index.js"
     }
   },
+  "files": [
+    "pricing-math/src",
+    "pricing-math/dist",
+    "pricing-math/tsconfig.json",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "route": "node --import tsx/esm cost-aware-vscode-router/src/route.ts",
     "demo": "node --import tsx/esm cost-aware-vscode-router/src/route.ts --demo",
