@@ -298,7 +298,10 @@ export interface HistoryAnalysis {
     age_days: number;
     source_url?: string;
   };
-  /** The entry the current price superseded, when the window shows it. */
+  /** The price the current one superseded, when the window shows it: the
+   *  latest earlier row with a different amount. A same-price row (a
+   *  re-cite of a new source, say) supersedes nothing, so it never reads as
+   *  a 0% "raise". */
   previous: {
     amount: number;
     effective_from: string;
@@ -317,8 +320,9 @@ export function daysBetween(fromIso: string, to: Date): number {
  *  the append-only pricing[] history the caller's plan window exposes.
  *  `today` also decides which row is current (SCO-735: it used to be the
  *  wall clock, whatever `today` said). "Previous" is the latest earlier row
- *  in the same region/currency/unit; a scheduled future row is never
- *  previous or current. */
+ *  in the same region/currency/unit whose amount differs from the current
+ *  one (a same-price row isn't a price change); a scheduled future row is
+ *  never previous or current. */
 export function analyzeHistory(
   provider: string,
   tier: Tier,
@@ -327,7 +331,13 @@ export function analyzeHistory(
   const cur = currentPrice(tier, todayIso(today));
   if (!cur) return null;
   const earlier = tier.pricing
-    .filter((p) => !p.archived && priceScope(p) === priceScope(cur) && p.effective_from < cur.effective_from)
+    .filter(
+      (p) =>
+        !p.archived &&
+        priceScope(p) === priceScope(cur) &&
+        p.effective_from < cur.effective_from &&
+        p.amount !== cur.amount,
+    )
     .sort((a, b) => a.effective_from.localeCompare(b.effective_from));
   const prev = earlier[earlier.length - 1] ?? null;
   return {
