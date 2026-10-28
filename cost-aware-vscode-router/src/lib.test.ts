@@ -22,7 +22,9 @@ import {
   normalise,
   selectCodingModel,
   selectWritingModel,
+  NON_HEADLINE_UNITS,
 } from "./lib.js";
+import * as PricingMath from "../../pricing-math/src/index.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -384,5 +386,11 @@ describe("normalise headline price (SCO-646)", () => {
     assert.equal(headlinePrice([tier("input", [[1.32, "2026-08-16"], [0.435, "2026-08-04"]])], "per_1m_tokens_input"), 1.32);
     assert.equal(headlinePrice([tier("input", [[0.14, "2026-08-04"], [0.44, "2026-08-16", "2026-09-09"]])], "per_1m_tokens_input"), null);
     assert.equal(currentPrice([tier("input", [[0.14, "2026-08-04"], [0.44, "2026-08-16", "2026-09-09"]])], "input"), null);
+  });
+});
+
+describe("NON_HEADLINE_UNITS (SCO-653)", () => {
+  test("is pricing-math's list, not a copy", () => {
+    assert.equal(NON_HEADLINE_UNITS, PricingMath.NON_HEADLINE_UNITS);
   });
 });
