@@ -140,6 +140,21 @@ describe("SCO-735: today is injectable and every helper agrees with activePrice(
     assert.equal(analyzeHistory("x", tier, TODAY_DATE)?.previous, null);
   });
 
+  test("a same-price row isn't a change: previous is the last different price", () => {
+    // Whisper Large v3 on Groq (2026-10-29): the 09-30 row only re-cited a new
+    // source at the same $0.00185/min, and read as a 0% "raise".
+    const recite: Tier = { id: "audio-minutes", pricing: [row(0.00185, "per_minute", "2024-10-01", "2026-09-29"), row(0.00185, "per_minute", "2026-09-30")] };
+    const h = analyzeHistory("groq", recite, TODAY_DATE)!;
+    assert.equal(h.current.amount, 0.00185);
+    assert.equal(h.previous, null);
+    // A real change before a re-cite is still found: $1 → $2, then re-cited at $2.
+    const changed: Tier = { id: "t", pricing: [row(1, IN, "2026-01-01", "2026-01-31"), row(2, IN, "2026-02-01", "2026-02-28"), row(2, IN, "2026-03-01")] };
+    const c = analyzeHistory("x", changed, TODAY_DATE)!;
+    assert.equal(c.previous?.amount, 1);
+    assert.equal(c.previous?.direction, "raise");
+    assert.equal(c.previous?.delta_pct, 100);
+  });
+
   test("previous stays within the same unit and region", () => {
     const tier: Tier = {
       id: "t",
