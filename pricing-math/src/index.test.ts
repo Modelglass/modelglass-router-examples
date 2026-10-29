@@ -155,6 +155,31 @@ describe("SCO-735: today is injectable and every helper agrees with activePrice(
     assert.equal(c.previous?.delta_pct, 100);
   });
 
+  test("stable_since: a same-price re-cite doesn't restart it (SCO-835, Whisper Large v3 on Groq)", () => {
+    const recite: Tier = { id: "audio-minutes", pricing: [row(0.00185, "per_minute", "2024-10-01", "2026-09-29"), row(0.00185, "per_minute", "2026-09-30")] };
+    const h = analyzeHistory("groq", recite, TODAY_DATE)!;
+    assert.equal(h.current.effective_from, "2026-09-30");
+    assert.equal(h.current.stable_since, "2024-10-01");
+    assert.equal(h.current.age_days, 15); // unchanged meaning: age of the current row
+  });
+
+  test("stable_since stops at a real price change, a gap, or another unit", () => {
+    // $1, then $2 from 02-01, re-cited at $2 from 03-01: stable since 02-01.
+    const changed: Tier = { id: "t", pricing: [row(1, IN, "2026-01-01", "2026-01-31"), row(2, IN, "2026-02-01", "2026-02-28"), row(2, IN, "2026-03-01")] };
+    assert.equal(analyzeHistory("x", changed, TODAY_DATE)!.current.stable_since, "2026-02-01");
+    // Same $2 but unpriced 02-11..02-28: the run restarts on 03-01.
+    const gap: Tier = { id: "t", pricing: [row(2, IN, "2026-02-01", "2026-02-10"), row(2, IN, "2026-03-01")] };
+    assert.equal(analyzeHistory("x", gap, TODAY_DATE)!.current.stable_since, "2026-03-01");
+    // An earlier row in another unit never extends the run.
+    const units: Tier = { id: "t", pricing: [row(2, "per_image", "2026-01-01", "2026-02-28"), row(2, IN, "2026-03-01")] };
+    assert.equal(analyzeHistory("x", units, TODAY_DATE)!.current.stable_since, "2026-03-01");
+  });
+
+  test("stable_since is the row's own date when nothing earlier matches", () => {
+    const single: Tier = { id: "t", pricing: [row(3, IN, "2026-05-01")] };
+    assert.equal(analyzeHistory("x", single, TODAY_DATE)!.current.stable_since, "2026-05-01");
+  });
+
   test("previous stays within the same unit and region", () => {
     const tier: Tier = {
       id: "t",

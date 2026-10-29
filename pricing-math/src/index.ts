@@ -296,6 +296,13 @@ export interface HistoryAnalysis {
     unit: string;
     effective_from: string;
     age_days: number;
+    /** SCO-835: the date this amount has applied since, without a break: the
+     *  `effective_from` of the earliest row in the current run of same-amount
+     *  rows (same region/currency/unit, each picking up where the last
+     *  ended). A same-price re-cite of a new source doesn't restart it, so it
+     *  can be earlier than `effective_from`. Computed from the rows the
+     *  caller's plan window lets through, like `visible_entries`. */
+    stable_since: string;
     source_url?: string;
   };
   /** The price the current one superseded, when the window shows it: the
@@ -309,6 +316,29 @@ export interface HistoryAnalysis {
     delta_pct: number;
     source_url?: string;
   } | null;
+}
+
+/** The ISO date the day before `iso`. */
+function dayBefore(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/** SCO-835: where the current amount's unbroken run starts. Walks back from
+ *  `cur` through earlier rows in its scope while each has the same amount
+ *  and ends no earlier than the day before the run's start (no gap). */
+function stableSince(tier: Tier, cur: PriceEntry): string {
+  const earlier = tier.pricing
+    .filter((p) => !p.archived && priceScope(p) === priceScope(cur) && p.effective_from < cur.effective_from)
+    .sort((a, b) => b.effective_from.localeCompare(a.effective_from));
+  let since = cur.effective_from;
+  for (const p of earlier) {
+    if (p.amount !== cur.amount) break;
+    if (p.effective_to && p.effective_to < dayBefore(since)) break;
+    since = p.effective_from;
+  }
+  return since;
 }
 
 export function daysBetween(fromIso: string, to: Date): number {
@@ -350,6 +380,7 @@ export function analyzeHistory(
       unit: cur.unit,
       effective_from: cur.effective_from,
       age_days: daysBetween(cur.effective_from, today),
+      stable_since: stableSince(tier, cur),
       source_url: cur.source?.url,
     },
     previous: prev
