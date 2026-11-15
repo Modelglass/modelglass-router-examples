@@ -155,8 +155,14 @@ export { NON_HEADLINE_UNITS, NON_HEADLINE_UNIT_LIST };
  * Same rule as the Modelglass site/API/MCP (SCO-640), so a model's headline
  * price here matches what modelglass.com.au shows. The unit list is
  * generated from core (./non-headline-units.ts); keep the rest in sync.
+ *
+ * ADR-0026: a tier can also opt out with `attributes.headline: false` (an
+ * image model's token rates, where the vendor's per-image price is the
+ * headline). Only the literal `false` counts, and `headline: true` never
+ * overrides the other guards.
  */
 export function isHeadlineTier(tier: Tier): boolean {
+  if (tier.attributes?.headline === false) return false;
   const processing = tier.attributes?.processing;
   if (processing !== undefined && processing !== null && processing !== "standard") return false;
   if (tier.pricing?.some((p) => NON_HEADLINE_UNITS.has(p.unit))) return false;

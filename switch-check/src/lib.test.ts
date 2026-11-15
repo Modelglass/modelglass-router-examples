@@ -546,3 +546,24 @@ describe("input-video seconds are never a headline price (SCO-813)", () => {
     assert.deepEqual([...fromOnly, ...toOnly], []);
   });
 });
+
+describe("token tiers marked headline: false (ADR-0026)", () => {
+  // An image model billed per token: the per-image price is the headline.
+  const H3_IMAGE = llmModel("minimax/h3-image", [
+    llmTier("image-output", 3.8, "per_1m_tokens_output", { headline: false, token_modality: "image" }),
+    llmTier("standard-1k", 0.0218, "per_image", { price_basis: "vendor_estimate" }),
+  ]);
+  const OTHER_IMAGE = llmModel("a/other-image", [
+    llmTier("image-output", 30, "per_1m_tokens_output", { headline: false, token_modality: "image" }),
+    llmTier("standard", 0.04, "per_image"),
+  ]);
+
+  test("the previous price (collectHeadlinePrices) is the per-image price only", () => {
+    assert.deepEqual(collectHeadlinePrices(H3_IMAGE).map((p) => [p.tier_id, p.amount]), [["standard-1k", 0.0218]]);
+  });
+  test("a switch compares per-image prices and never the shared token unit", () => {
+    const { shared, fromOnly, toOnly } = comparePrices(H3_IMAGE, OTHER_IMAGE);
+    assert.deepEqual(shared.map((s) => [s.unit, s.from.amount, s.to.amount]), [["per_image", 0.0218, 0.04]]);
+    assert.deepEqual([...fromOnly, ...toOnly], []);
+  });
+});
