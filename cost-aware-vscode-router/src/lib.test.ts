@@ -405,3 +405,21 @@ describe("input-video seconds are never a headline price (SCO-813)", () => {
     assert.equal(headlinePrice(tiers, "per_input_video_second"), null);
   });
 });
+
+describe("attributes.headline: false opts a tier out of the headline (ADR-0026)", () => {
+  // An audio-input rate on an LLM, flagged and cheaper than the text rate.
+  const tiers = [
+    priced("audio-input", 0.5, "per_1m_tokens_input", { headline: false, token_modality: "audio" }),
+    priced("input", 2, "per_1m_tokens_input"),
+  ];
+  test("isHeadlineTier rejects a flagged tier, and only the literal false counts", () => {
+    assert.equal(isHeadlineTier(tiers[0]!), false);
+    assert.equal(isHeadlineTier(priced("input", 2, "per_1m_tokens_input", { headline: "false" })), true);
+  });
+  test("headlinePrice ranks on the text rate, not the cheaper flagged rate", () => {
+    assert.equal(headlinePrice(tiers, "per_1m_tokens_input"), 2);
+  });
+  test("agrees with pricing-math on flagged tiers", () => {
+    for (const t of tiers) assert.equal(isHeadlineTier(t), PricingMath.isHeadlineTier(t as never));
+  });
+});

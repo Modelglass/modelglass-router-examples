@@ -359,9 +359,11 @@ export { NON_HEADLINE_UNITS };
  * they never win a "cheapest" pick. Context-length tiers (`input-64k` /
  * `input-256k`) stay eligible, so the lowest base rate wins by convention.
  * Same rule as ../../pricing-math's isHeadlineTier (and the same unit list,
- * imported from it). Keep the rest in sync.
+ * imported from it). Keep the rest in sync. ADR-0026: a tier marked
+ * `attributes.headline: false` opts out too (only the literal `false`).
  */
 export function isHeadlineTier(tier: Tier): boolean {
+  if (tier.attributes?.headline === false) return false;
   const processing = tier.attributes?.processing;
   if (processing !== undefined && processing !== null && processing !== "standard") return false;
   if (tier.pricing?.some((p) => NON_HEADLINE_UNITS.has(p.unit))) return false;

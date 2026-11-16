@@ -242,3 +242,33 @@ describe("input-video seconds are never a headline price (SCO-813)", () => {
     assert.equal(isHeadlineTier({ id: "standard", pricing: [row(0.15, "per_input_video_second", "2026-10-01")] }), false);
   });
 });
+
+// ADR-0026: an image model billed per token keeps the vendor's per-image price
+// as its headline; its token rates are extra tiers marked headline: false.
+// The flagged tiers come first, so a first-tier reader would hit them.
+const H3_IMAGE = model("minimax/h3-image", "minimax-h3-image-minimax", "minimax", [
+  { id: "image-input", attributes: { headline: false, token_modality: "image" }, pricing: [row(1.5, IN, "2026-11-15")] },
+  { id: "image-output", attributes: { headline: false, token_modality: "image" }, pricing: [row(3.8, OUT, "2026-11-15")] },
+  { id: "standard-1k", attributes: { price_basis: "vendor_estimate" }, pricing: [row(0.0218, "per_image", "2026-11-15")] },
+]);
+
+describe("attributes.headline: false opts a tier out of the headline (ADR-0026)", () => {
+  test("isHeadlineTier rejects a flagged tier whatever its unit or id", () => {
+    assert.equal(isHeadlineTier({ id: "input", attributes: { headline: false }, pricing: [row(1, IN, "2026-11-15")] }), false);
+    assert.equal(isHeadlineTier({ id: "standard", attributes: { headline: false }, pricing: [row(0.02, "per_image", "2026-11-15")] }), false);
+  });
+  test("only the literal false counts, and headline: true overrides nothing", () => {
+    assert.equal(isHeadlineTier({ id: "input", attributes: { headline: "false" }, pricing: [row(1, IN, "2026-11-15")] }), true);
+    assert.equal(isHeadlineTier({ id: "batch-input", attributes: { headline: true }, pricing: [row(1, IN, "2026-11-15")] }), false);
+  });
+  test("collectHeadlinePrices keeps the per-image price and drops the token rates", () => {
+    assert.deepEqual(amountsByTier(collectHeadlinePrices(H3_IMAGE, "2026-11-16")), { "standard-1k": 0.0218 });
+  });
+  test("collectCurrentPrices still lists every tier", () => {
+    assert.deepEqual(amountsByTier(collectCurrentPrices(H3_IMAGE, "2026-11-16")), {
+      "image-input": 1.5,
+      "image-output": 3.8,
+      "standard-1k": 0.0218,
+    });
+  });
+});
