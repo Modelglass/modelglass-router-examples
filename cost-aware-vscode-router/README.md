@@ -99,7 +99,7 @@ the SWE-bench Verified score read from the feed's structured
 `knowledge.benchmarks` field (not `quality_tier` — qualitative ratings are
 excluded, and the score is **not** parsed out of prose notes). These scores are
 curated in the Modelglass coding-capability registry — the same data behind
-[modelglass.com.au/coding](https://modelglass.com.au/coding) — and every entry
+Modelglass's [coding benchmark leaderboard](https://modelglass.com.au/coding) — and every entry
 carries provenance: a source URL and its type (`vendor` / `leaderboard` /
 `paper` / `independent`), which the routing table displays next to each score.
 Models with no curated SWE-bench Verified score are shown as excluded with the
